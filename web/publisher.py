@@ -19,8 +19,9 @@ THE BUCKET LAYOUT is the contract with the Worker (apps/dashboard/src/contract.t
                                 KEY = symbol with "/" -> "-" (BTC/USD -> BTC-USD)
     look/<date>/plate.png       the look's wardrobe plate
     look/<date>/keyframe.png    the look's stage keyframe
-    media/history.json          the recap index, URLs rewritten to /media/...?v=<sha>
-    media/<date>/<slot>/<file>  final EN + zh recap videos, covers, meta.json
+    media/history.json          the recap index: youtube_id, /media/...?v=<sha> URLs
+    media/<date>/<slot>/<file>  meta.json (zh fields stripped), the EN cover, and
+                                the EN mp4 only as a fallback (see RECAP MEDIA)
     approvals/<date>.json       written by the Worker; read and applied here
 
 ONE CYCLE, in order:
@@ -33,9 +34,33 @@ ONE CYCLE, in order:
   3. snapshot   build every section separately (one failing source becomes
                 {"error": ...} in its own section and blocks nothing else)
   4. charts     at most every 5 minutes
-  5. media      new/changed archive files, history.json, retention pruning.
-                Runs under its OWN lock after the main lock is released, so a
-                long video upload never stops the next minute's snapshot.
+  5. media      new/changed archive files, history.json, reconciliation of the
+                retention window, pruning of older dates. Runs under its OWN
+                lock after the main lock is released, so a long video upload
+                never stops the next minute's snapshot.
+
+RECAP MEDIA (owner's decision, 2026-11-27): the cloud dashboard plays a recap
+from YouTube, and the Chinese cut stays on the home box. It is still rendered,
+archived and shown on the local :8787 page, but no zh file and no zh field is
+ever uploaded: meta.json and history.json are stripped of every *_zh* field.
+An edition whose meta.json records an embeddable English upload
+(youtube.en.id, privacy "public" or "unlisted") is listed with `youtube_id`
+and only its meta.json and EN cover (the player's poster) go up. Without one,
+its EN mp4 is uploaded as a FALLBACK once YOUTUBE_GRACE_SEC have passed since
+`generated_at` (the upload runs right after the render, so a fresh edition
+gets time to get its id first); until then it is not listed. publish_youtube
+records nothing on a refused or failed upload (only the success record), so
+the grace period is the only signal. When an id appears later, the edition
+switches to it and the fallback mp4 is deleted.
+
+Every media sync then reconciles the window: under media/<date>/ for dates
+inside it, any object that is not wanted is deleted (zh files, an mp4 a
+youtube_id has replaced, files of an edition gone from the archive). It only
+ever deletes under media/<date>/, never media/history.json, snapshot/,
+chart/, look/ or approvals/, never before the history.json that stops
+pointing at the object has been sent, and never on a guess: a slot that is
+still being written or cannot be read keeps its EN files, and when the
+archive cannot be read only zh-named objects go.
 
 Unchanged objects are not re-uploaded: every key's content hash lives in
 $ALPACA_DATA_DIR/publisher/state.json (written atomically). The snapshot is the
@@ -61,7 +86,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import copy
 import fcntl
 import hashlib
 import io
@@ -117,13 +141,15 @@ RENDER_HOUR_ET = 20
 CHART_HEARTBEAT_SEC = 3600
 PRUNE_EVERY_SEC = 3600
 
-# R2's free tier is 10 GB-month; the budget is 8 GB at steady state. Measured
-# on the recap archive over 2026-10-27..11-26: 22 editions in 30 days, each
-# uploading 155 MB on average (EN + zh mp4, two covers, meta.json; max
-# 174 MB), i.e. 114 MB per calendar day, plus ~2.7 MB of look images per date
-# and ~1 MB of snapshot/charts/history. 40 days keeps 41 dated folders:
-# ~4.8 GB at the measured rate, ~7.4 GB even with a 174 MB edition EVERY day
-# and one more uploaded before the hourly prune. (45 would be ~8.3 GB then.)
+# R2's free tier is 10 GB-month; the budget is 8 GB. Measured on the recap
+# archive over the 41 dated folders to 2026-11-26: 29 editions. An edition on
+# YouTube uploads its EN cover (1.39 MB on average, at most 1.89 MB) and its
+# zh-stripped meta.json (~2 KB): ~40 MB for the window, plus ~2.7 MB of look
+# images per date and ~1 MB of snapshot/charts/history, ~0.15 GB in all.
+# A FALLBACK edition adds its EN mp4 (72.6 MB on average, at most 86.2 MB).
+# Even if EVERY day fell back with the largest one (YouTube down for six
+# weeks), 41 folders plus one more edition uploaded before the hourly prune is
+# ~3.8 GB; with the old 174 MB EN + zh edition size it would still be ~7.4 GB.
 # The bucket's media/ lifecycle rule must expire objects LATER than this:
 # retention + 2 days (docs/cloud-dashboard.md, step 2).
 DEFAULT_RETENTION_DAYS = 40
@@ -135,6 +161,15 @@ HISTORY_HEARTBEAT_SEC = 86400
 # A file modified this recently may still be being written by the renderer
 # (briefing/generate.py copies the mp4s first and writes meta.json last).
 MEDIA_SETTLE_SEC = 120
+# How long an edition without an embeddable YouTube id waits, from its
+# generated_at, before its EN mp4 is uploaded as the fallback. run_briefing.sh
+# publishes right after the render (8-14 minutes later on the real archive,
+# QC included); a manual retry the same evening still lands inside it.
+YOUTUBE_GRACE_SEC = 3 * 3600
+# A YouTube video id, and the privacy settings a viewer can embed: a private
+# video does not play in another account's player.
+_YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+EMBEDDABLE_PRIVACY = frozenset({"public", "unlisted"})
 META_MAX_BYTES = 1024 * 1024
 LOOK_ASSET_MAX_BYTES = 25 * 1024 * 1024
 
@@ -163,17 +198,25 @@ _LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 
 MEDIA_TYPES = {".mp4": "video/mp4", ".png": "image/png", ".jpg": "image/jpeg",
                ".jpeg": "image/jpeg", ".webp": "image/webp"}
-# (meta.json field naming a file, history.json field carrying its URL)
+# (meta.json field naming a file, history.json field carrying its URL). English
+# only: the zh cut (briefing_file_zh, cover_file_zh, cover_file_zh_bili) stays
+# on the home box.
 MEDIA_FILE_FIELDS = (
     ("briefing_file", "briefing"),
-    ("briefing_file_zh", "briefing_zh"),
     ("cover_file", "cover"),
-    ("cover_file_zh", "cover_zh"),
-    ("cover_file_zh_bili", "cover_zh_bili"),
 )
-# Never displayed by the dashboard, so never sent: `desk` is an account digest
-# and `youtube` holds upload records.
-_META_DROP = ("desk", "youtube")
+# Never displayed by the dashboard, so never sent: `desk` is an account digest,
+# `youtube` and `youtube_superseded` hold upload records (the one id the page
+# needs travels as the validated `youtube_id`), and a `youtube_id` in the
+# archive's own meta.json is never trusted as one.
+_META_DROP = ("desk", "youtube", "youtube_superseded", "youtube_id")
+# A field or file name of the Chinese cut: "zh" as a whole _-. separated word
+# (title_zh, title_zh_check, keywords_zh, clip_file_zh, file_zh,
+# ..._cover_zh_bili.png). Such a field is stripped from everything uploaded,
+# and such an object is deleted from the bucket wherever it is found.
+_ZH_WORD_RE = re.compile(r"(?:^|[._-])zh(?:[._-]|$)", re.IGNORECASE)
+# media/<date>/<slot>/<rest>: an edition's object.
+_EDITION_KEY_RE = re.compile(r"^media/(\d{4}-\d{2}-\d{2})/([^/]+)/(.+)$")
 
 
 # --------------------------------------------------------------------------
@@ -528,27 +571,128 @@ def look_asset_url(date: str, kind: str, data: bytes) -> str:
 # --------------------------------------------------------------------------
 # the recap archive
 # --------------------------------------------------------------------------
+def is_zh(name: object) -> bool:
+    """Is `name` (a meta.json field, or a file name) part of the Chinese cut?"""
+    return isinstance(name, str) and bool(_ZH_WORD_RE.search(name))
+
+
+def strip_zh(obj):
+    """`obj` without any zh field, at any depth (edition and clip level)."""
+    if isinstance(obj, dict):
+        return {k: strip_zh(v) for k, v in obj.items() if not is_zh(k)}
+    if isinstance(obj, list):
+        return [strip_zh(v) for v in obj]
+    return obj
+
+
+def youtube_embed_id(meta: dict) -> str | None:
+    """The EN upload's YouTube id when a viewer can embed it: meta.json's
+    youtube.en.id is a well-formed 11-character id AND its recorded privacy is
+    public or unlisted. None otherwise (no upload, a private one, a zh-only
+    one, or a malformed record)."""
+    yt = meta.get("youtube")
+    rec = yt.get("en") if isinstance(yt, dict) else None
+    if not isinstance(rec, dict):
+        return None
+    vid = rec.get("id")
+    if not isinstance(vid, str) or not _YOUTUBE_ID_RE.fullmatch(vid):
+        return None
+    return vid if rec.get("privacy") in EMBEDDABLE_PRIVACY else None
+
+
+# What the cloud does with an edition (ArchiveEdition.decide).
+ON_YOUTUBE = "youtube"      # listed with youtube_id; meta.json + EN cover uploaded
+FALLBACK = "fallback"       # listed with the uploaded EN mp4; meta.json + cover + mp4
+WAITING = "waiting"         # inside the grace period: not listed, nothing uploaded
+
+
 @dataclass
 class ArchiveEdition:
     date: str
     slot: str
     dir: Path
     meta: dict
-    files: dict[str, Path] = field(default_factory=dict)   # file name -> local path
+    files: dict[str, Path] = field(default_factory=dict)   # EN file name -> local path
+    meta_mtime: float = 0.0
+    status: str | None = None       # ON_YOUTUBE / FALLBACK / WAITING, set by scan_archive
 
     @property
     def prefix(self) -> str:
         return f"media/{self.date}/{self.slot}/"
 
+    @property
+    def youtube_id(self) -> str | None:
+        return youtube_embed_id(self.meta)
+
+    @property
+    def video_name(self) -> str:
+        return self.meta["briefing_file"]
+
+    @property
+    def cover_name(self) -> str | None:
+        name = self.meta.get("cover_file")
+        return name if isinstance(name, str) and name in self.files else None
+
+    def generated_epoch(self) -> float:
+        """generated_at as an epoch (a naive stamp is UTC); the meta.json
+        mtime when it is missing or not a timestamp."""
+        stamp = self.meta.get("generated_at")
+        if isinstance(stamp, str):
+            try:
+                when = datetime.fromisoformat(stamp)
+            except ValueError:
+                pass
+            else:
+                if when.tzinfo is None:
+                    when = when.replace(tzinfo=timezone.utc)
+                return when.timestamp()
+        return self.meta_mtime
+
+    def decide(self, now: float) -> str:
+        if self.youtube_id:
+            return ON_YOUTUBE
+        if now - self.generated_epoch() >= YOUTUBE_GRACE_SEC:
+            return FALLBACK
+        return WAITING
+
+    def plan(self, now: float) -> str:
+        return self.status or self.decide(now)
+
+    def upload_names(self, now: float) -> list[str]:
+        """The archive files the bucket should hold for this edition."""
+        status = self.plan(now)
+        if status == WAITING:
+            return []
+        names = [self.cover_name] if self.cover_name else []
+        if status == FALLBACK:
+            names.append(self.video_name)
+        return names
+
+    def keep_keys(self, now: float) -> set[str]:
+        """Objects of this edition that reconciliation must leave alone. A
+        WAITING edition keeps whatever EN objects it already has (a re-render
+        that lost its YouTube record): they are replaced or removed once it
+        is decided, never deleted on the way there."""
+        status = self.plan(now)
+        names = {"meta.json"}
+        if self.cover_name:
+            names.add(self.cover_name)
+        if status != ON_YOUTUBE:
+            names.add(self.video_name)
+        return {self.prefix + n for n in names}
+
     def clean_meta(self) -> dict:
-        """meta.json as uploaded: file NAMES only, no URLs, nothing undisplayed."""
-        m = copy.deepcopy(self.meta)
+        """meta.json as uploaded: file NAMES only, no URLs, nothing undisplayed,
+        nothing of the zh cut."""
+        m = strip_zh(self.meta)         # a copy: strip_zh rebuilds every dict and list
         for k in (*_META_DROP, "local", *(url for _, url in MEDIA_FILE_FIELDS)):
             m.pop(k, None)
+        for name_field, _ in MEDIA_FILE_FIELDS:
+            if is_zh(m.get(name_field)):     # a zh file named where an EN one belongs
+                m.pop(name_field)
         for c in m.get("clips") or []:
             if isinstance(c, dict):
                 c.pop("file", None)
-                c.pop("file_zh", None)
         m.setdefault("date", self.date)
         m["kind"] = "slideshow" if self.slot.startswith("slideshow") else "video"
         m["slot"] = self.slot
@@ -557,9 +701,11 @@ class ArchiveEdition:
 
 def _safe_media_file(slot_dir: Path, archive_root: Path, name) -> Path | None:
     """The archive file `name` inside `slot_dir`, or None when the name is not
-    a plain file name the Worker would serve, is a per-scene clip, or resolves
-    anywhere outside the archive."""
+    a plain file name the Worker would serve, is a per-scene clip, belongs to
+    the zh cut, or resolves anywhere outside the archive."""
     if not isinstance(name, str) or not _FILE_RE.fullmatch(name) or name.startswith("clip_"):
+        return None
+    if is_zh(name):
         return None
     if Path(name).suffix.lower() not in MEDIA_TYPES:
         return None
@@ -577,8 +723,10 @@ def _safe_media_file(slot_dir: Path, archive_root: Path, name) -> Path | None:
 
 def scan_archive(root: Path, cutoff: Date, now: float) -> list[ArchiveEdition]:
     """Dated editions (<root>/<YYYY-MM-DD>/<slot>/meta.json) on or after `cutoff`,
-    newest first. Underscore dirs (_special_..., test renders) are not dated and
-    are skipped, exactly as briefing/generate.py's rebuild_history skips them."""
+    newest first, each with its EN files and its status decided at `now`.
+    Underscore dirs (_special_..., test renders) are not dated and are
+    skipped, exactly as briefing/generate.py's rebuild_history skips them. An
+    edition whose EN video is not in the archive is skipped too."""
     try:
         root_real = root.resolve(strict=True)
         days = [p for p in root.iterdir() if p.is_dir()]
@@ -613,7 +761,7 @@ def scan_archive(root: Path, cutoff: Date, now: float) -> list[ArchiveEdition]:
                 continue
             if not isinstance(meta, dict) or not isinstance(meta.get("briefing_file"), str):
                 continue
-            ed = ArchiveEdition(day.name, slot_dir.name, slot_dir, meta)
+            ed = ArchiveEdition(day.name, slot_dir.name, slot_dir, meta, meta_mtime=st.st_mtime)
             for field_name, _ in MEDIA_FILE_FIELDS:
                 name = meta.get(field_name)
                 if not name:
@@ -625,10 +773,49 @@ def scan_archive(root: Path, cutoff: Date, now: float) -> list[ArchiveEdition]:
                     log.warning("media %s/%s: briefing file missing or unsafe; edition skipped",
                                 day.name, slot_dir.name)
             if meta["briefing_file"] in ed.files:
+                ed.status = ed.decide(now)
                 out.append(ed)
     out.sort(key=lambda e: (str(e.meta.get("date") or e.date),
                             str(e.meta.get("generated_at") or "")), reverse=True)
     return out
+
+
+def local_slots(root: Path, cutoff: Date) -> set[tuple[str, str]] | None:
+    """Every (date, slot) folder in the archive dated on or after `cutoff`,
+    whatever its state, or None when the archive (or one of those date
+    folders) cannot be read: then nobody knows what is gone."""
+    try:
+        days = [p for p in root.iterdir() if p.is_dir()]
+    except OSError:
+        return None
+    out: set[tuple[str, str]] = set()
+    for day in days:
+        if not _valid_date(day.name) or Date.fromisoformat(day.name) < cutoff:
+            continue
+        try:
+            out.update((day.name, p.name) for p in day.iterdir() if p.is_dir())
+        except OSError:
+            return None
+    return out
+
+
+def _unwanted(key: str, decided: set[tuple[str, str]],
+              local: set[tuple[str, str]] | None) -> bool:
+    """Should reconciliation delete `key`, a media/<date>/ object inside the
+    window that no scanned edition keeps? `decided` holds the (date, slot)
+    editions this run read; `local` every (date, slot) folder in the archive,
+    or None when the archive cannot be read."""
+    if is_zh(key.rsplit("/", 1)[-1]):
+        return True                 # the zh cut is never wanted in the cloud
+    m = _EDITION_KEY_RE.match(key)
+    slot = (m.group(1), m.group(2)) if m else None
+    if slot in decided:
+        return True                 # its edition was read: what it does not keep goes
+    if local is None:
+        return False                # the archive cannot be read: nothing else is known
+    # A folder that is still being written or cannot be read keeps its files;
+    # one that is gone from the archive (or a key no edition writes) does not.
+    return slot not in local
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -649,15 +836,24 @@ def media_url(key: str, sha256: str | None) -> str:
 
 def build_history(editions: list[ArchiveEdition], present: set[str], now: float,
                   versions: dict[str, str] | None = None) -> dict:
-    """media/history.json: briefing/generate.py's rebuild_history shape, with
-    /archive/ URLs rewritten to /media/ and every URL pointing at an object
-    that is actually in the bucket. An edition whose EN video is not uploaded
-    is left out; a clip keeps `file` only when it names an uploaded full video
-    (legacy story renders, whose clips are chapters of it). `versions` maps a
-    media key to the SHA-256 of the object the bucket holds (media_url)."""
+    """media/history.json: briefing/generate.py's rebuild_history shape minus
+    every zh field, with every URL pointing at an object that is actually in
+    the bucket.
+
+    An edition on YouTube carries `youtube_id` and no `briefing`; a FALLBACK
+    edition carries `briefing`, the uploaded EN mp4, and keeps it only while
+    that is in the bucket; a WAITING one is left out, and so is a fallback
+    whose mp4 is not uploaded yet. `cover` is the uploaded EN cover, the
+    poster for either player. A clip keeps `file` only when it names the
+    uploaded EN video (legacy story renders, whose clips are chapters of it).
+    `versions` maps a media key to the SHA-256 of the object the bucket holds
+    (media_url)."""
     versions = versions or {}
     briefings = []
     for ed in editions:
+        status = ed.plan(now)
+        if status == WAITING:
+            continue
         e = ed.clean_meta()
 
         def url_for(name):
@@ -665,19 +861,19 @@ def build_history(editions: list[ArchiveEdition], present: set[str], now: float,
                 return media_url(ed.prefix + name, versions.get(ed.prefix + name))
             return None
 
-        for field_name, url_key in MEDIA_FILE_FIELDS:
-            url = url_for(ed.meta.get(field_name))
-            if url:
-                e[url_key] = url
-        if "briefing" not in e:
-            continue
-        for c in e.get("clips") or []:
-            if not isinstance(c, dict):
+        cover = url_for(ed.cover_name)
+        if cover:
+            e["cover"] = cover
+        if status == ON_YOUTUBE:
+            e["youtube_id"] = ed.youtube_id
+        else:
+            video = url_for(ed.video_name)
+            if not video:
                 continue
-            for src, dst in (("clip_file", "file"), ("clip_file_zh", "file_zh")):
-                url = url_for(c.get(src))
-                if url:
-                    c[dst] = url
+            e["briefing"] = video
+            for c in e.get("clips") or []:
+                if isinstance(c, dict) and c.get("clip_file") == ed.video_name:
+                    c["file"] = video
         e["local"] = False
         briefings.append(e)
     briefings.sort(key=lambda m: (str(m.get("date") or ""), str(m.get("generated_at") or "")),
@@ -1181,7 +1377,8 @@ class Publisher:
         self.state.refresh()
         now = self.clock()
         cutoff = _et_today(now) - timedelta(days=self.opts.retention_days)
-        editions = scan_archive(Path(web_server.MEDIA_ARCHIVE_DIR), cutoff, now)
+        root = Path(web_server.MEDIA_ARCHIVE_DIR)
+        editions = scan_archive(root, cutoff, now)
         # Everything the bucket already holds counts as present from the start,
         # so a history.json written mid-run never drops an older edition.
         known = self.state.dest().get("media") or {}
@@ -1194,16 +1391,17 @@ class Publisher:
         ok, sent, failed = True, 0, 0
         for ed in editions:
             changed = False
-            for name, path in ed.files.items():
+            for name in ed.upload_names(now):
                 try:
-                    if self._sync_media_file(ed.prefix + name, path, present) == "put":
+                    if self._sync_media_file(ed.prefix + name, ed.files[name], present) == "put":
                         sent += 1
                         changed = True
                 except Exception as exc:        # noqa: BLE001 — next file, next run
                     ok, failed = False, failed + 1
                     log.error("media %s%s failed: %s", ed.prefix, name, _err(exc))
-            if ed.prefix + ed.meta["briefing_file"] not in present:
-                continue
+            if ed.status == WAITING or (ed.status == FALLBACK
+                                        and ed.prefix + ed.video_name not in present):
+                continue                        # not listed (yet): no meta.json either
             try:
                 changed |= self.put_json(ed.prefix + "meta.json", ed.clean_meta())
                 if changed:     # newest first: a fresh recap shows up before a backfill ends
@@ -1221,17 +1419,83 @@ class Publisher:
         except Exception as exc:                # noqa: BLE001
             ok = False
             log.error("history.json failed: %s", _err(exc))
+        # Only once the bucket's history.json no longer points at what goes.
+        deleted = "skipped"
+        if history != "FAILED":
+            try:
+                deleted = self.reconcile(editions, cutoff, root, now, present)
+            except Exception as exc:            # noqa: BLE001
+                ok, deleted = False, "FAILED"
+                log.error("media reconciliation failed: %s", _err(exc))
         pruned = "FAILED"
         try:
             pruned = self.prune(cutoff)
         except Exception as exc:                # noqa: BLE001
             ok = False
             log.error("retention pruning failed: %s", _err(exc))
-        if sent or failed or history != "same" or pruned not in ("0", "not due"):
-            log.info("%smedia editions=%d put=%d failed=%d history=%s pruned=%s (%.1fs)",
-                     "[dry-run] " if self.opts.dry_run else "", len(editions), sent, failed,
-                     history, pruned, time.monotonic() - started)
+        if sent or failed or history != "same" or deleted != "0" or pruned not in ("0", "not due"):
+            status = [ed.status for ed in editions]
+            log.info("%smedia editions=%d youtube=%d fallback=%d waiting=%d put=%d failed=%d "
+                     "history=%s deleted=%s pruned=%s (%.1fs)",
+                     "[dry-run] " if self.opts.dry_run else "", len(editions),
+                     status.count(ON_YOUTUBE), status.count(FALLBACK), status.count(WAITING),
+                     sent, failed, history, deleted, pruned, time.monotonic() - started)
         return ok
+
+    def reconcile(self, editions: list[ArchiveEdition], cutoff: Date, root: Path,
+                  now: float, present: set[str]) -> str:
+        """Make media/<date>/ for every date inside the window hold exactly
+        what the editions want (module docstring, RECAP MEDIA): delete every
+        other object there. Returns how many were deleted (in a dry run: would
+        be, each printed as a DELETE line). Never touches media/history.json,
+        snapshot/, chart/, look/, approvals/, or a date the prune owns.
+
+        It also notices an object the state says was uploaded but the bucket
+        does not hold (deleted by hand, or expired), and forgets it, so the
+        next run sends it again."""
+        limit = cutoff.isoformat()
+        keep: set[str] = set()
+        decided: set[tuple[str, str]] = set()
+        for ed in editions:
+            keep |= ed.keep_keys(now)
+            decided.add((ed.date, ed.slot))
+        local = local_slots(root, cutoff)
+        listed: set[str] = set()
+        doomed: list[str] = []
+        for obj in self.dest.list("media/"):
+            m = _DATED_KEY_RE.match(obj.key)
+            if not obj.key.startswith("media/") or not m or m.group(1) < limit:
+                continue        # media/history.json, or a date the prune handles
+            listed.add(obj.key)
+            if obj.key not in keep and _unwanted(obj.key, decided, local):
+                doomed.append(obj.key)
+        if self.opts.dry_run:
+            for k in doomed:
+                self._dry("DELETE", k)
+            return str(len(doomed))
+        dest_state = self.state.dest()
+        recorded = {**(dest_state.get("objects") or {}), **(dest_state.get("media") or {})}
+        missing = {k for k in keep if k in recorded and k not in listed}
+        if missing:
+            log.warning("media: %d uploaded object(s) are not in the bucket; "
+                        "they are sent again next run", len(missing))
+        forget_keys = set(doomed) | missing
+        if forget_keys:
+            # Forgotten BEFORE the delete: if it fails half way, the state
+            # never claims an object the bucket no longer holds, and the next
+            # listing finds whatever is left.
+            def forget(d: dict) -> None:
+                for section in ("media", "objects"):
+                    sec = d.get(section) or {}
+                    for k in forget_keys:
+                        sec.pop(k, None)
+            self.state.update(forget)
+        for k in doomed:
+            present.discard(k)
+            self._media_versions.pop(k, None)
+        if doomed:
+            self.dest.delete(doomed)
+        return str(len(doomed))
 
     def prune(self, cutoff: Date) -> str:
         """Delete media/<date>/ and look/<date>/ objects dated before `cutoff`.
@@ -1388,7 +1652,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="print what would be uploaded, applied or deleted; change nothing")
     ap.add_argument("--media", action=argparse.BooleanOptionalAction, default=None,
                     help="sync the recap archive (default: on for R2, off with --out-dir, "
-                         "since it copies every video within the retention window)")
+                         "since it copies the covers, and any fallback video, within the "
+                         "retention window)")
     ap.add_argument("--retention-days", type=int, default=DEFAULT_RETENTION_DAYS, metavar="N",
                     help=f"keep N days of recaps in the bucket (default {DEFAULT_RETENTION_DAYS})")
     ap.add_argument("--force", action="store_true",
