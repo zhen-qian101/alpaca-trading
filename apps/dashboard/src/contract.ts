@@ -11,11 +11,22 @@
  *   look/<date>/plate.png            wardrobe plate image
  *   look/<date>/keyframe.png         stage keyframe image
  *   media/history.json               History        (URLs rewritten to /media/)
- *   media/<date>/<slot>/<file>       final EN + zh recap mp4s, cover PNGs and
- *                                    meta.json (EditionMeta). NOT the per-scene
- *                                    clip_*.mp4 files.
+ *   media/<date>/<slot>/meta.json    EditionMeta (zh fields stripped)
+ *   media/<date>/<slot>/<cover>.png  the EN cover: the poster for either player
+ *   media/<date>/<slot>/<video>.mp4  the EN recap, ONLY as the fallback for an
+ *                                    edition that did not reach YouTube
+ *                                    (Edition.briefing)
  *   approvals/<date>.json            ApprovalRequest, written by the Worker,
  *                                    applied at home with set_look_approval()
+ *
+ * RECAP VIDEOS play from YouTube (Edition.youtube_id), embedded from
+ * youtube-nocookie.com only after the viewer presses play. The Chinese (zh)
+ * cut is NEVER uploaded: it is rendered and archived at home and shown on the
+ * local :8787 page only, so no zh video, cover, title or field exists anywhere
+ * in the bucket, in history.json or in an uploaded meta.json. The per-scene
+ * clip_*.mp4 files are never uploaded either. Each media sync deletes every
+ * other object under media/<date>/ for the dates in its retention window
+ * (and whole dates past it), so the bucket converges to exactly this set.
  *
  * Most shapes mirror a Python builder field for field, and each interface
  * names its source. Snake_case is kept on purpose: these objects are JSON the
@@ -578,18 +589,43 @@ export interface History {
   generated_at: IsoUtc
   /** Date of the newest render. */
   current: IsoDate | null
-  /** Sorted by (date, generated_at) descending. Only editions whose files were uploaded. */
+  /**
+   * Sorted by (date, generated_at) descending. Only editions that can be
+   * played: each has `youtube_id`, or `briefing` (the fallback mp4), never
+   * neither.
+   */
   briefings: Edition[]
 }
 
 /**
+ * A YouTube video id: exactly 11 characters of [A-Za-z0-9_-]. Anything else
+ * is never put into an embed URL.
+ */
+export const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/
+
+/**
+ * The publisher gives an edition without an embeddable YouTube id this long
+ * after its `generated_at` to get one (the upload runs right after the
+ * render) before it uploads the EN mp4 as the fallback instead: 3 hours.
+ * Mirrors YOUTUBE_GRACE_SEC in web/publisher.py; kept a plain literal so a
+ * Python test can read it from this file, as it reads FRESHNESS.
+ */
+export const YOUTUBE_GRACE_SEC = 10_800
+
+/**
  * media/<date>/<slot>/meta.json: one rendered edition as briefing/generate.py
- * archived it (file NAMES only, no URLs).
+ * archived it (file NAMES only, no URLs), minus what the publisher never
+ * uploads: every zh field (the Chinese cut stays at home), `desk` (the
+ * account digest the DESK slide was drawn from) and `youtube` (the raw upload
+ * records; history.json carries `youtube_id` instead).
  */
 export interface EditionMeta {
   date: IsoDate
   generated_at: IsoUtc
-  /** Full English video file name. */
+  /**
+   * Full English video file name. Named even when that file is not in R2
+   * (an edition that plays from YouTube).
+   */
   briefing_file: string
   /** Runtime of the EN video in seconds. */
   duration_s: number
@@ -612,62 +648,59 @@ export interface EditionMeta {
   kind: 'video' | 'slideshow'
   /** Archive subdirectory: "video" or "slideshow-<label-slug>". */
   slot: string
-  briefing_file_zh?: string
-  voice_zh?: string | null
-  title_zh?: string
-  title_zh_check?: TitleZhCheck
   cover_head?: CoverHead
   cover_file?: string
-  cover_file_zh?: string
-  cover_file_zh_bili?: string
-  /** Account digest the DESK slide was drawn from. Not displayed; the publisher may drop it. */
-  desk?: Record<string, unknown>
-  /** Upload records, keyed by language. Not displayed; the publisher may drop it. */
-  youtube?: Record<string, unknown>
 }
 
 /**
- * One history.json entry: the archived meta plus same-origin URLs. Every URL
+ * One history.json entry: the archived meta plus how to play it. Every URL
  * points at an object the publisher actually uploaded; a URL whose file was
  * not uploaded is removed, never left dangling.
+ *
+ * Playback: `youtube_id` when the edition is on YouTube, else `briefing`. The
+ * publisher never sends both, and never lists an edition with neither; the
+ * SPA drops such an entry itself too (features/briefing/editions.ts).
  */
 export interface Edition extends EditionMeta {
-  briefing: MediaUrl
-  briefing_zh?: MediaUrl
+  /**
+   * The EN cut on YouTube (YOUTUBE_ID_RE). Present iff meta.json's
+   * `youtube.en` upload record has an id AND its privacy is "public" or
+   * "unlisted": a private video cannot be embedded for a viewer.
+   */
+  youtube_id?: string
+  /**
+   * The EN mp4 in R2: the FALLBACK for an edition still without an
+   * embeddable YouTube id YOUTUBE_GRACE_SEC after its `generated_at`
+   * (web/publisher.py). Before that the edition is not listed at all. A
+   * refused or failed YouTube publish records nothing in meta.json, so the
+   * wait is the only signal. When an id appears later (a manual retry), the
+   * publisher switches the edition to `youtube_id` and deletes this mp4.
+   */
+  briefing?: MediaUrl
+  /** The EN cover PNG, the poster for either player. Uploaded for every listed edition that has one. */
   cover?: MediaUrl
-  cover_zh?: MediaUrl
-  cover_zh_bili?: MediaUrl
   /** Always false in the cloud copy. */
   local: boolean
 }
 
 /**
  * One scene of the running order. Per-scene clip_*.mp4 files are NOT
- * uploaded, so `file` / `file_zh` survive only when they name an uploaded
- * full video (legacy story renders, where `start_s` is the chapter offset).
- * Without `file`, a row is a label and plays nothing on its own.
+ * uploaded, so `file` survives only when it names the uploaded full video
+ * (a legacy story render served from the fallback mp4, where `start_s` is the
+ * chapter offset). Without `file`, a row is a label and plays nothing on its
+ * own.
  */
 export interface EditionClip {
   /** "OVERVIEW", "DESK", a ticker, or a character name in story renders. */
   symbol: string
   clip_file: string
-  clip_file_zh?: string
   duration_s: number
   bias: Bias | null
   headline: string
   mood?: string
-  /** Seconds into `file` where this scene starts. */
+  /** Seconds into the full EN video where this scene starts (legacy story renders). */
   start_s?: number
   file?: MediaUrl
-  file_zh?: MediaUrl
-}
-
-export interface TitleZhCheck {
-  model: string
-  checked: boolean
-  ok: boolean
-  errors: unknown[]
-  rewritten: boolean
 }
 
 export interface CoverHead {

@@ -10,8 +10,17 @@
 # the library's licence asks), drop 'unsafe-inline'.
 # If the SPA loads web fonts from Google, add https://fonts.googleapis.com to
 # style-src and https://fonts.gstatic.com to font-src.
+#
+# frame-src: the recap's YouTube player, from the no-cookie domain only, and
+# only once the viewer presses play (src/lib/youtube.ts). Nothing else from
+# YouTube is allowed: no script, no thumbnail (the poster is the R2 cover),
+# no API. The page stays Referrer-Policy: no-referrer; the player's iframe
+# alone sets referrerpolicy="strict-origin-when-cross-origin", because
+# YouTube's embed refuses to play without a referrer, so YouTube sees this
+# origin (never a path) and only after the click.
+# devserver/headers.test.ts holds this policy to its exact string.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; frame-src https://www.youtube-nocookie.com; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY

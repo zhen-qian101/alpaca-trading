@@ -44,12 +44,12 @@ describe('mediaTarget', () => {
       contentType: 'application/json; charset=utf-8',
       ext: 'json',
     })
-    expect(mediaTarget('2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04_cover_zh_bili.png')).toEqual({
-      key: 'media/2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04_cover_zh_bili.png',
+    expect(mediaTarget('2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04_cover.png')).toEqual({
+      key: 'media/2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04_cover.png',
       contentType: 'image/png',
       ext: 'png',
     })
-    expect(mediaTarget('2026-03-04/video/briefing_2026-03-04_zh.MP4')?.contentType).toBe('video/mp4')
+    expect(mediaTarget('2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04.MP4')?.contentType).toBe('video/mp4')
   })
 
   it('refuses traversal and anything outside the two shapes, given raw strings', () => {

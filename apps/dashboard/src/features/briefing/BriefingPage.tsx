@@ -5,21 +5,19 @@ import type { Edition } from '../../contract.ts'
 import { Age, BiasTag, ErrorNote, Panel, Skeleton } from '../../components/ui.tsx'
 import { isAuthError, isNotFound } from '../../lib/api.ts'
 import { useHistory } from '../../lib/queries.ts'
-import { readPref, writePref } from '../../lib/storage.ts'
 import { formatIsoDate, isoToEpoch } from '../../lib/time.ts'
 import { useDocumentTitle } from '../../lib/useDocumentTitle.ts'
+import { embedUrl, watchUrl } from '../../lib/youtube.ts'
 import {
   chapterAt,
   chaptersFor,
   editionId,
-  effectiveLang,
   groupByDate,
-  hasZh,
   mmss,
-  posterSrc,
-  titleFor,
-  videoSrc,
-  type Lang,
+  playableEditions,
+  playbackFor,
+  type Chapter,
+  type Playback,
 } from './editions.ts'
 
 function kindLabel(e: Edition): string {
@@ -54,10 +52,7 @@ function EditionList({ editions, currentId, onPick }: { editions: Edition[]; cur
                   <span className="min-w-0 font-semibold">{e.label ?? kindLabel(e)}</span>
                   <span className="mono text-xs text-muted">{mmss(e.duration_s)}</span>
                   <span className="min-w-0 truncate text-[0.8125rem] text-muted">{e.title ?? 'Untitled'}</span>
-                  <span className="text-xs text-muted">
-                    {kindLabel(e)}
-                    {hasZh(e) ? ', EN + 中文' : ''}
-                  </span>
+                  <span className="text-xs text-muted">{kindLabel(e)}</span>
                 </button>
               )
             })}
@@ -68,59 +63,131 @@ function EditionList({ editions, currentId, onPick }: { editions: Edition[]; cur
   )
 }
 
-function LangToggle({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
+/** "Post-market recap for Wed, 4 Mar 2026". */
+function editionName(e: Edition): string {
+  return `${e.label ?? kindLabel(e)} for ${formatIsoDate(e.date)}`
+}
+
+/**
+ * The YouTube player, started: a no-cookie embed, created fresh (keyed by
+ * `n`) for each play or chapter jump. A new iframe rather than a new `src`, so
+ * a jump adds no entry to the browser's back history.
+ */
+interface YoutubeRun {
+  /** Whole seconds into the video. */
+  start: number
+  n: number
+  /** Move keyboard focus into the player (the play button it replaces is gone). */
+  focus: boolean
+}
+
+/**
+ * The click-to-play stand-in for a YouTube edition: the R2 cover, or a plain
+ * placeholder. Nothing is requested from YouTube, no thumbnail and no script,
+ * until the viewer presses it (or picks a chapter).
+ */
+function Facade({ edition, onPlay }: { edition: Edition; onPlay: () => void }) {
+  const [coverFailed, setCoverFailed] = useState(false)
+  const runtime = edition.duration_s ? `, ${mmss(edition.duration_s)}` : ''
   return (
-    <div className="seg" role="group" aria-label="Narration language">
-      <button type="button" aria-pressed={lang === 'en'} onClick={() => onChange('en')} lang="en">
-        EN
-      </button>
-      <button type="button" aria-pressed={lang === 'zh'} onClick={() => onChange('zh')} lang="zh">
-        中文
-      </button>
-    </div>
+    <button
+      type="button"
+      className="facade"
+      onClick={onPlay}
+      aria-label={`Play ${editionName(edition)}${runtime}. Loads the YouTube player.`}
+    >
+      {edition.cover && !coverFailed ? (
+        <img src={edition.cover} alt="" decoding="async" onError={() => setCoverFailed(true)} />
+      ) : (
+        <span className="facade__placeholder" aria-hidden="true">
+          <span className="font-semibold">{edition.label ?? kindLabel(edition)}</span>
+          <span className="mono text-xs">{formatIsoDate(edition.date)}</span>
+        </span>
+      )}
+      <span className="facade__play" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" focusable="false">
+          <path d="M7 4.5v15l12.5-7.5Z" fill="currentColor" />
+        </svg>
+      </span>
+      <span className="facade__note" aria-hidden="true">
+        Plays from YouTube
+      </span>
+    </button>
   )
 }
 
-function Player({ edition, wantedLang, onLang }: { edition: Edition; wantedLang: Lang; onLang: (l: Lang) => void }) {
-  const lang = effectiveLang(edition, wantedLang)
-  const src = videoSrc(edition, lang)
+function Player({ edition, playback }: { edition: Edition; playback: Playback }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const frameRef = useRef<HTMLIFrameElement>(null)
   const [duration, setDuration] = useState<number | null>(null)
   const [time, setTime] = useState(0)
-  // The parent keys this component by edition + language, so a new source
-  // always starts from a clean duration / position / error state.
+  // The parent keys this component by edition and player kind, so a new
+  // edition (or one the publisher moved from its fallback mp4 to YouTube)
+  // starts from a clean duration / position / error state, and a YouTube
+  // edition from its play button.
   const [failed, setFailed] = useState(false)
+  const [run, setRun] = useState<YoutubeRun | null>(null)
 
-  const chapters = useMemo(() => chaptersFor(edition, lang, duration), [edition, lang, duration])
-  const current = chapterAt(chapters, time)
+  useEffect(() => {
+    if (run?.focus) frameRef.current?.focus()
+  }, [run])
+
+  const chapters = useMemo(() => chaptersFor(edition, duration), [edition, duration])
+  // An embedded YouTube player does not report its position (no player API is
+  // loaded), so only the <video> marks the chapter playing.
+  const current = playback.kind === 'file' ? chapterAt(chapters, time) : -1
   const approximate = chapters.length > 0 && !chapters[0].exact
-  const title = titleFor(edition, lang)
+  const name = editionName(edition)
 
-  const seek = (start: number) => {
+  const play = (start: number, focus: boolean) =>
+    setRun((prev) => ({ start: Math.max(0, Math.floor(start)), n: (prev?.n ?? 0) + 1, focus }))
+
+  const seek = (c: Chapter) => {
+    if (playback.kind === 'youtube') {
+      play(c.start, false)
+      return
+    }
     const v = videoRef.current
     if (!v) return
-    v.currentTime = start
+    v.currentTime = c.start
     void v.play().catch(() => {})
   }
 
   return (
     <div className="min-w-0">
       <div className="video-frame">
-        <video
-          key={src}
-          ref={videoRef}
-          src={src}
-          poster={posterSrc(edition, lang)}
-          controls
-          preload="metadata"
-          playsInline
-          lang={lang === 'zh' ? 'zh' : 'en'}
-          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-          onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-          onError={() => setFailed(true)}
-        >
-          <p>Your browser cannot play this video.</p>
-        </video>
+        {playback.kind === 'file' ? (
+          <video
+            key={playback.src}
+            ref={videoRef}
+            src={playback.src}
+            poster={edition.cover}
+            controls
+            preload="metadata"
+            playsInline
+            lang="en"
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+            onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+            onError={() => setFailed(true)}
+          >
+            <p>Your browser cannot play this video.</p>
+          </video>
+        ) : run ? (
+          <iframe
+            key={run.n}
+            ref={frameRef}
+            src={embedUrl(playback.id, run.start)}
+            title={`${name} (YouTube player)`}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            // The page sends no referrer anywhere (public/_headers), but
+            // YouTube's player refuses to play without one: this request alone
+            // sends the dashboard's origin, never a path.
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <Facade edition={edition} onPlay={() => play(0, true)} />
+        )}
       </div>
       {failed ? (
         <div className="note note--error mt-2" role="alert">
@@ -133,22 +200,32 @@ function Player({ edition, wantedLang, onLang }: { edition: Edition; wantedLang:
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="m-0 text-xl leading-snug" lang={lang === 'zh' && edition.title_zh ? 'zh' : 'en'}>
-            {title ?? edition.label ?? 'Recap'}
-          </h2>
-          <p className="m-0 mt-0.5 text-[0.8125rem] text-muted">
-            {edition.label ?? kindLabel(edition)} for {formatIsoDate(edition.date)}
-          </p>
-        </div>
-        {hasZh(edition) ? <LangToggle lang={lang} onChange={onLang} /> : null}
+      <div className="mt-3 min-w-0">
+        <h2 className="m-0 text-xl leading-snug">{edition.title ?? edition.label ?? 'Recap'}</h2>
+        <p className="m-0 mt-0.5 text-[0.8125rem] text-muted">
+          {name}
+          {playback.kind === 'youtube' ? (
+            <>
+              {' · '}
+              <a
+                className="underline underline-offset-2 hover:text-ink"
+                href={watchUrl(playback.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open on YouTube
+              </a>
+            </>
+          ) : (
+            ' · Not on YouTube: playing the copy uploaded from home'
+          )}
+        </p>
       </div>
 
       <dl className="m-0 mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-[0.8125rem] sm:grid-cols-4">
         <div>
           <dt className="text-xs text-muted">Runtime</dt>
-          <dd className="m-0 mono">{mmss(lang === 'zh' && duration ? duration : edition.duration_s)}</dd>
+          <dd className="m-0 mono">{mmss(edition.duration_s)}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted">Format</dt>
@@ -156,7 +233,7 @@ function Player({ edition, wantedLang, onLang }: { edition: Edition; wantedLang:
         </div>
         <div>
           <dt className="text-xs text-muted">Voice</dt>
-          <dd className="m-0 mono">{voiceName(lang === 'zh' ? edition.voice_zh : edition.voice)}</dd>
+          <dd className="m-0 mono">{voiceName(edition.voice)}</dd>
         </div>
         <div>
           <dt className="text-xs text-muted">Rendered</dt>
@@ -183,7 +260,7 @@ function Player({ edition, wantedLang, onLang }: { edition: Edition; wantedLang:
                   type="button"
                   className="chapter"
                   aria-current={i === current ? 'true' : undefined}
-                  onClick={() => seek(c.start)}
+                  onClick={() => seek(c)}
                 >
                   <span className="mono text-[0.8125rem] text-muted">
                     {c.exact ? '' : '≈'}
@@ -206,17 +283,22 @@ function Player({ edition, wantedLang, onLang }: { edition: Edition; wantedLang:
   )
 }
 
-/** The recap archive: pick an edition, watch it in English or Chinese, jump by chapter. */
+/**
+ * The recap archive: pick an edition, watch it (from YouTube after a click,
+ * or the uploaded fallback mp4), jump by chapter. English only: the Chinese
+ * cut stays on the home box.
+ */
 export function BriefingPage() {
   useDocumentTitle('Briefing')
   const query = useHistory()
   const [params, setParams] = useSearchParams()
-  const [wantedLang, setWantedLang] = useState<Lang>(() => (readPref('lang') === 'zh' ? 'zh' : 'en'))
 
-  const editions = query.data?.briefings ?? []
+  const editions = useMemo(() => playableEditions(query.data?.briefings ?? []), [query.data])
   const requested = params.get('edition')
   const edition = editions.find((e) => editionId(e) === requested) ?? editions[0]
   const shownId = edition ? editionId(edition) : null
+  // Never null for a listed edition: playableEditions() kept only those.
+  const playback = edition ? playbackFor(edition) : null
 
   // Pin the edition on screen into the URL. history.json is refetched every
   // few minutes and several editions are published a day: without the pin,
@@ -239,7 +321,7 @@ export function BriefingPage() {
   // Set once, during the render that first has the list (React's pattern for
   // state that follows earlier renders).
   const [known, setKnown] = useState<ReadonlySet<string> | null>(null)
-  if (known === null && query.data) setKnown(new Set(query.data.briefings.map(editionId)))
+  if (known === null && query.data) setKnown(new Set(editions.map(editionId)))
   const newest = editions[0]
   const announced =
     known !== null && newest && !known.has(editionId(newest)) && editionId(newest) !== shownId ? newest : null
@@ -249,10 +331,6 @@ export function BriefingPage() {
     const next = new URLSearchParams(params)
     next.set('edition', id)
     setParams(next, { replace: true })
-  }
-  const setLang = (l: Lang) => {
-    setWantedLang(l)
-    writePref('lang', l)
   }
 
   let body
@@ -274,7 +352,7 @@ export function BriefingPage() {
         ) : null}
       </div>
     )
-  } else if (!edition) {
+  } else if (!edition || !playback) {
     body = (
       <div className="max-w-2xl py-8">
         <p className="m-0 text-base">No recap has been published yet.</p>
@@ -298,12 +376,7 @@ export function BriefingPage() {
               </button>
             </div>
           ) : null}
-          <Player
-            key={`${editionId(edition)}:${effectiveLang(edition, wantedLang)}`}
-            edition={edition}
-            wantedLang={wantedLang}
-            onLang={setLang}
-          />
+          <Player key={`${editionId(edition)}:${playback.kind}`} edition={edition} playback={playback} />
         </div>
         <div className="min-w-0 lg:col-span-4">
           <EditionList editions={editions} currentId={editionId(edition)} onPick={pick} />
