@@ -111,8 +111,15 @@ English video only as a fallback for an edition that never got there.
   points at those objects is in the bucket, and never touches
   `media/history.json`, `snapshot/`, `chart/`, `look/` or `approvals/`. A slot
   whose `meta.json` is still being written, or cannot be read, keeps its
-  English files; if the archive itself cannot be read (the disk is not
-  mounted), only zh objects are deleted. `--dry-run` prints a `DELETE` line
+  English files. If the archive yields no edition at all (the path is gone,
+  or it holds no readable `meta.json`: empty, or only tonight's folder that
+  the renderer recreated on an unmounted disk), only zh objects are deleted.
+  If more than two editions, or more than a quarter of those the window holds
+  in the bucket, are gone from the archive at once (that same disk once
+  tonight's render has finished on it, or a wrong `BRIEFING_ARCHIVE_DIR`),
+  their English objects stay and the run logs an error with the counts; zh
+  objects and the extras of the editions it did read still go. A bad render
+  removed by hand is deleted. `--dry-run` prints a `DELETE` line
   for each object it would remove, and the log gives counts, never keys.
   Dates older than the window are pruned hourly, as before.
 

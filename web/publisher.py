@@ -59,8 +59,12 @@ youtube_id has replaced, files of an edition gone from the archive). It only
 ever deletes under media/<date>/, never media/history.json, snapshot/,
 chart/, look/ or approvals/, never before the history.json that stops
 pointing at the object has been sent, and never on a guess: a slot that is
-still being written or cannot be read keeps its EN files, and when the
-archive cannot be read only zh-named objects go.
+still being written or cannot be read keeps its EN files; when the archive
+cannot be read, or yields no edition at all (empty, or only tonight's folder
+recreated on an unmounted disk), only zh-named objects go; and when more than
+MAX_VANISHED_EDITIONS editions (or more than a quarter of the window's) are
+gone from the archive at once, their EN objects stay and the run logs an
+error instead.
 
 Unchanged objects are not re-uploaded: every key's content hash lives in
 $ALPACA_DATA_DIR/publisher/state.json (written atomically). The snapshot is the
@@ -166,6 +170,12 @@ MEDIA_SETTLE_SEC = 120
 # publishes right after the render (8-14 minutes later on the real archive,
 # QC included); a manual retry the same evening still lands inside it.
 YOUTUBE_GRACE_SEC = 3 * 3600
+# Reconciliation deletes the objects of an edition that is gone from the
+# archive (a bad render removed by hand), but not when more than this many
+# editions, or more than a quarter of those the window holds in the bucket,
+# are gone at once. That is an unmounted disk whose path the renderer's mkdir
+# recreated, or a wrong BRIEFING_ARCHIVE_DIR, not a repair.
+MAX_VANISHED_EDITIONS = 2
 # A YouTube video id, and the privacy settings a viewer can embed: a private
 # video does not play in another account's player.
 _YOUTUBE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -799,6 +809,13 @@ def local_slots(root: Path, cutoff: Date) -> set[tuple[str, str]] | None:
     return out
 
 
+def _edition_slot(key: str) -> tuple[str, str] | None:
+    """The (date, slot) edition that media object `key` belongs to, or None
+    for a key that is not media/<date>/<slot>/<name>."""
+    m = _EDITION_KEY_RE.match(key)
+    return (m.group(1), m.group(2)) if m else None
+
+
 def _unwanted(key: str, decided: set[tuple[str, str]],
               local: set[tuple[str, str]] | None) -> bool:
     """Should reconciliation delete `key`, a media/<date>/ object inside the
@@ -807,8 +824,7 @@ def _unwanted(key: str, decided: set[tuple[str, str]],
     or None when the archive cannot be read."""
     if is_zh(key.rsplit("/", 1)[-1]):
         return True                 # the zh cut is never wanted in the cloud
-    m = _EDITION_KEY_RE.match(key)
-    slot = (m.group(1), m.group(2)) if m else None
+    slot = _edition_slot(key)
     if slot in decided:
         return True                 # its edition was read: what it does not keep goes
     if local is None:
@@ -1448,7 +1464,10 @@ class Publisher:
         what the editions want (module docstring, RECAP MEDIA): delete every
         other object there. Returns how many were deleted (in a dry run: would
         be, each printed as a DELETE line). Never touches media/history.json,
-        snapshot/, chart/, look/, approvals/, or a date the prune owns.
+        snapshot/, chart/, look/, approvals/, or a date the prune owns, and
+        never deletes the objects of editions gone from the archive when more
+        than MAX_VANISHED_EDITIONS of them (or more than a quarter of the
+        window's) are gone at once.
 
         It also notices an object the state says was uploaded but the bucket
         does not hold (deleted by hand, or expired), and forgets it, so the
@@ -1459,16 +1478,36 @@ class Publisher:
         for ed in editions:
             keep |= ed.keep_keys(now)
             decided.add((ed.date, ed.slot))
-        local = local_slots(root, cutoff)
+        # An archive that exists but yields no edition at all (empty, or only
+        # tonight's folder recreated on an unmounted disk, its meta.json not
+        # written yet) tells nothing about what is gone: treat it like one
+        # that cannot be read, so only zh objects go.
+        local = local_slots(root, cutoff) if decided else None
         listed: set[str] = set()
-        doomed: list[str] = []
+        # (key, the edition it would go with when that edition is gone from
+        # the archive, else None), in listing order.
+        unwanted: list[tuple[str, tuple[str, str] | None]] = []
         for obj in self.dest.list("media/"):
             m = _DATED_KEY_RE.match(obj.key)
             if not obj.key.startswith("media/") or not m or m.group(1) < limit:
                 continue        # media/history.json, or a date the prune handles
             listed.add(obj.key)
             if obj.key not in keep and _unwanted(obj.key, decided, local):
-                doomed.append(obj.key)
+                slot = _edition_slot(obj.key)
+                gone = (slot is not None and slot not in decided
+                        and not is_zh(obj.key.rsplit("/", 1)[-1]))
+                unwanted.append((obj.key, slot if gone else None))
+        # Many editions gone at once is a missing disk or a wrong path, not a
+        # repair: keep their objects (zh ones and a read edition's extras
+        # still go) and say so. The guard counts editions, not objects.
+        vanished = {s for _, s in unwanted if s is not None}
+        window = {s for s in map(_edition_slot, listed) if s is not None}
+        hold = len(vanished) > MAX_VANISHED_EDITIONS or 4 * len(vanished) > len(window)
+        if vanished and hold:
+            log.error("media: %d of the %d editions in the bucket's window vanished from the "
+                      "archive at once; not deleting their %d object(s). Is the disk mounted?",
+                      len(vanished), len(window), sum(1 for _, s in unwanted if s is not None))
+        doomed = [k for k, s in unwanted if s is None or not hold]
         if self.opts.dry_run:
             for k in doomed:
                 self._dry("DELETE", k)

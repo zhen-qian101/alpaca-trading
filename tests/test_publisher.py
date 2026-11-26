@@ -17,7 +17,9 @@ properties locked in below are:
     points at a missing object;
   * each media sync deletes what the bucket should no longer hold inside the
     window (zh files, videos a youtube_id replaced), only after history.json
-    stopped pointing at it, and never anything outside media/<date>/;
+    stopped pointing at it, never anything outside media/<date>/, and never
+    the EN objects of an edition it could not read, nor of many editions that
+    vanished from the archive at once (an unmounted disk, a wrong path);
   * overlapping cron runs exit at once;
   * the publisher cannot reach the order path, and needs no boto3 for --out-dir.
 
@@ -37,6 +39,7 @@ import math
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -1410,6 +1413,12 @@ def _record_upload(world, slot_dir: Path, youtube: dict) -> None:
     os.utime(mp, (at, at))
 
 
+def _recorded(world) -> set[str]:
+    """Every key the state says the bucket holds (JSON and media files)."""
+    state = _dest_state(world)
+    return set(state.get("objects") or {}) | set(state.get("media") or {})
+
+
 def _deletes(s3) -> list[str]:
     return [k for c in s3.calls if c[0] == "delete_objects" for k in c[1]]
 
@@ -1632,6 +1641,127 @@ def test_an_unreadable_archive_only_loses_its_zh_objects(world, make_pub, s3, mo
     make_pub().media_cycle()
     assert {keys["en"], keys["cover"], keys["meta"]} <= set(s3.objects)
     assert not {keys["zh"], keys["cover_zh"], keys["bili"]} & set(s3.objects)
+
+
+def _publish_dates(world, pub, s3, n: int) -> tuple[list[str], set[str]]:
+    """n editions on YouTube, dated yesterday and back, published once.
+    Returns (dates, every key the bucket then holds but history.json)."""
+    dates = [world.day(-i) for i in range(1, n + 1)]
+    for d in dates:
+        world.edition(d, youtube=yt_record())
+    assert pub.media_cycle()
+    return dates, {k for k in s3.objects if k != "media/history.json"}
+
+
+@pytest.mark.parametrize("tonight", ["empty", "folder-only", "rendered"])
+def test_an_archive_that_lost_its_editions_keeps_their_objects(world, make_pub, s3, clock,
+                                                               caplog, tonight):
+    """/mnt/sandisk not mounted, but the path is there: empty, or holding only
+    tonight's folder that generate.py's mkdir recreated, before or after its
+    meta.json is written. None of that says the other editions are gone, so
+    every EN object of the other dates stays (and stays in the state, so
+    nothing is re-sent when the disk is back); only the zh cut goes."""
+    pub = make_pub()
+    dates, en = _publish_dates(world, pub, s3, 5)
+    assert len(en) == 10                                    # meta.json + cover each
+    zh = f"media/{dates[0]}/video/post-market-recap_{dates[0]}_zh.mp4"
+    s3.objects[zh] = {"body": b"old zh"}
+    on_disk = world.tmp / "archive-on-the-disk"
+    world.archive.rename(on_disk)
+    world.archive.mkdir()
+    if tonight == "folder-only":
+        (world.archive / world.session / "video").mkdir(parents=True)
+    elif tonight == "rendered":
+        world.edition(world.session, youtube=yt_record())
+    caplog.set_level(logging.ERROR, logger="publisher")
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    assert en <= set(s3.objects) and en <= _recorded(world)
+    assert _deletes(s3) == [zh]
+    if tonight == "rendered":
+        assert "5 of the 6 editions in the bucket's window vanished" in caplog.text
+        assert not [d for d in dates if d in caplog.text]   # counts, never keys
+
+    if tonight == "rendered":                               # the disk is back
+        shutil.move(world.archive / world.session, on_disk / world.session)
+    shutil.rmtree(world.archive)
+    on_disk.rename(world.archive)
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    assert s3.written() == ["media/history.json"]           # listed again, nothing re-sent
+    listed = [e["date"] for e in s3.json("media/history.json")["briefings"]]
+    assert listed == ([world.session] if tonight == "rendered" else []) + dates
+
+
+@pytest.mark.parametrize("editions,removed,deleted", [
+    (5, 1, True),           # one bad render removed by hand
+    (8, 2, True),           # two, and no more than a quarter of the window
+    (5, 2, False),          # more than a quarter of the window at once
+    (12, 3, False),         # more than MAX_VANISHED_EDITIONS at once
+    (3, 1, False),          # a small window: even one is more than a quarter
+])
+def test_editions_gone_from_the_archive_are_deleted_unless_too_many_vanish_at_once(
+        world, make_pub, s3, clock, caplog, editions, removed, deleted):
+    pub = make_pub()
+    dates, before = _publish_dates(world, pub, s3, editions)
+    gone = dates[-removed:]
+    for d in gone:
+        shutil.rmtree(world.archive / d)
+    caplog.set_level(logging.ERROR, logger="publisher")
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    theirs = {k for k in before if k.split("/")[1] in gone}
+    assert len(theirs) == 2 * removed
+    if deleted:
+        assert set(_deletes(s3)) == theirs and not theirs & set(s3.objects)
+        assert not theirs & _recorded(world)
+        assert "vanished" not in caplog.text
+    else:
+        assert _deletes(s3) == [] and before <= set(s3.objects)
+        assert f"{removed} of the {editions} editions" in caplog.text
+    listed = [e["date"] for e in s3.json("media/history.json")["briefings"]]
+    assert listed == dates[:editions - removed]
+
+
+@pytest.mark.parametrize("damage", ["not-json", "not-an-object", "removed", "unreadable-folder"])
+def test_an_edition_whose_meta_json_cannot_be_read_keeps_its_objects(world, make_pub, s3,
+                                                                     clock, damage):
+    """A meta.json that fails to parse, is not an object, is gone, or sits in
+    a date folder that cannot be listed tells nothing about the edition: its
+    objects stay, and only its zh objects go."""
+    d = world.day(-1)
+    slot_dir, meta = world.edition(d, youtube=yt_record())
+    world.edition(world.day(-2), youtube=yt_record())       # read normally: the scan is not empty
+    pub = make_pub()
+    assert pub.media_cycle()
+    mine = {f"media/{d}/video/meta.json", f"media/{d}/video/{meta['cover_file']}"}
+    assert mine <= set(s3.objects)
+    zh = {f"media/{d}/video/{meta['briefing_file_zh']}", f"media/{d}/video/{meta['cover_file_zh']}"}
+    for k in zh:
+        s3.objects[k] = {"body": b"old zh"}
+    clock.t += 60
+    mp = slot_dir / "meta.json"
+    if damage == "not-json":
+        mp.write_text("{not json")
+    elif damage == "not-an-object":
+        mp.write_text("[]")
+    elif damage == "removed":
+        mp.unlink()
+    if mp.exists():                                         # settled: the scan does read it
+        at = clock.t - pubmod.MEDIA_SETTLE_SEC - 1
+        os.utime(mp, (at, at))
+    s3.reset_calls()
+    if damage == "unreadable-folder":
+        os.chmod(world.archive / d, 0)
+    try:
+        assert pub.media_cycle()
+    finally:
+        os.chmod(world.archive / d, 0o755)
+    assert mine <= set(s3.objects) and mine <= _recorded(world)
+    assert set(_deletes(s3)) == zh
 
 
 def test_dry_run_reconciliation_deletes_nothing_and_prints_each_delete(world, s3, clock):
