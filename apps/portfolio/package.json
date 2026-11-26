@@ -1,0 +1,47 @@
+{
+	"name": "alpaca-portfolio",
+	"private": true,
+	"version": "0.0.0",
+	"description": "Public portfolio site for the Alpaca trading system: a static React SPA served as Cloudflare Workers Static Assets, reading one published portfolio.json.",
+	"type": "module",
+	"packageManager": "pnpm@12.23.0+sha512.02da94ffaf133f46074322afe552f90d40b5f71ae259aefbccdacc5085b1d617e98d65e0131f5748b9b67445978ee5055d7d59a473f1eef0d504854fefcd5975",
+	"engines": {
+		"node": ">=22.22.0"
+	},
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -b && vite build",
+		"preview": "vite preview",
+		"lint": "oxlint --deny-warnings",
+		"typecheck": "tsc -b",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"check-data": "node scripts/check-portfolio.ts",
+		"check-licenses": "node scripts/check-licenses.ts",
+		"stage-data": "node scripts/stage-data.ts",
+		"dev:assets": "wrangler dev"
+	},
+	"dependencies": {
+		"lightweight-charts": "^5.3.0",
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.3.5",
+		"@testing-library/dom": "^10.4.2",
+		"@testing-library/jest-dom": "^8.0.0",
+		"@testing-library/react": "^16.3.3",
+		"@testing-library/user-event": "^14.6.13",
+		"@types/node": "^24.19.2",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
+		"jsdom": "^31.0.1",
+		"oxlint": "^1.90.0",
+		"tailwindcss": "^4.3.5",
+		"typescript": "~7.0.2",
+		"vite": "^8.3.6",
+		"vitest": "^5.1.1",
+		"wrangler": "^4.168.0"
+	}
+}

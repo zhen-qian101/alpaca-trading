@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Alpaca Terminal</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>📈</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand__mark">ALPACA</span>
+    <span class="brand__sub">terminal</span>
+  </div>
+  <div class="topbar__status">
+    <span id="acctBadge" class="badge badge--muted">…</span>
+    <span id="engineBadge" class="badge badge--muted"><span class="dot"></span>engine</span>
+    <span id="haltBadge" class="badge badge--muted">halt —</span>
+  </div>
+  <div class="topbar__right">
+    <span id="updated" class="stamp mono">—</span>
+    <a class="btn" href="/briefing.html" title="Daily research briefing video">briefing</a>
+    <a class="btn" href="/look.html" title="Sign off the presenter's outfit before tonight's render">look</a>
+    <button id="refreshBtn" class="btn" title="Refresh all panels now">refresh</button>
+  </div>
+</header>
+
+<main class="grid">
+
+ <div class="col col--left">
+
+  <!-- ---------- Portfolio ---------- -->
+  <section class="card card--portfolio" aria-labelledby="h-portfolio">
+    <div class="card__head">
+      <h2 id="h-portfolio">Portfolio</h2>
+      <span class="card__note mono" id="portfolioNote"></span>
+    </div>
+    <div class="card__body">
+      <div class="hero">
+        <div class="hero__label">Account equity</div>
+        <div class="hero__value" id="equity">—</div>
+        <div class="hero__delta" id="equityDelta">—</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat__label">Cash</div><div class="stat__value mono" id="cash">—</div></div>
+        <div class="stat"><div class="stat__label">Buying power</div><div class="stat__value mono" id="bp">—</div></div>
+        <div class="stat"><div class="stat__label">Prev close equity</div><div class="stat__value mono" id="lastEquity">—</div></div>
+      </div>
+
+      <div class="meter" id="haltMeter">
+        <div class="meter__head">
+          <span class="meter__label">Daily loss limit</span>
+          <span class="meter__val mono" id="haltText">—</span>
+        </div>
+        <div class="meter__track"><div class="meter__fill" id="haltFill"></div></div>
+        <div class="meter__foot">Circuit breaker halts <strong>buys only</strong> — exits always allowed.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------- Rotation board ---------- -->
+  <section class="card card--board" aria-labelledby="h-board">
+    <div class="card__head">
+      <h2 id="h-board">Rotation board</h2>
+      <span class="card__note mono" id="boardNote"></span>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="tablewrap">
+        <table class="tbl" id="boardTable">
+          <thead><tr>
+            <th class="num">Pri</th><th>Symbol</th><th>Bias</th>
+            <th class="num" title="What ONE position in this name would deploy if it were the one taken. The book is all-in/all-out and holds one position at a time, so these do not add up — they are per-candidate, not an allocation.">If taken</th><th class="num">Max pos</th><th>Contingency</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <details class="notes" id="notesBox">
+        <summary>Research notes</summary>
+        <div class="notes__body" id="notesBody"></div>
+      </details>
+    </div>
+  </section>
+
+ </div><!-- /col--left -->
+
+ <div class="col col--right">
+
+  <!-- ---------- Positions ---------- -->
+  <section class="card card--positions" aria-labelledby="h-positions">
+    <div class="card__head">
+      <h2 id="h-positions">Open positions</h2>
+      <span class="card__note mono" id="posNote"></span>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="tablewrap">
+        <table class="tbl" id="posTable">
+          <thead><tr>
+            <th>Symbol</th><th class="num">Qty</th><th class="num">Entry</th><th class="num">Last</th>
+            <th class="num">Value</th><th class="num">Unreal. P&amp;L</th><th class="num">Stop</th><th class="num">To stop</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty" id="posEmpty" hidden>Flat — no open positions.</p>
+    </div>
+  </section>
+
+  <!-- ---------- Charts ---------- -->
+  <section class="card card--chart" aria-labelledby="h-chart">
+    <div class="card__head">
+      <h2 id="h-chart">Signal chart</h2>
+      <span class="card__note mono" id="chartNote"></span>
+    </div>
+    <nav class="symbols" id="symbolNav" aria-label="Symbol"></nav>
+    <div class="card__body card__body--flush">
+      <div class="chartstack">
+        <div class="pane pane--price">
+          <div class="ohlc mono" id="ohlc"></div>
+          <div id="chartPrice"></div>
+        </div>
+        <div class="pane pane--sub"><span class="pane__tag mono" id="rsiTag">RSI</span><div id="chartRsi"></div></div>
+        <div class="pane pane--sub"><span class="pane__tag mono" id="macdTag">MACD</span><div id="chartMacd"></div></div>
+      </div>
+      <div class="legend">
+        <span class="legend__item"><span class="legend__swatch" style="background:var(--up)"></span>Up candle / MACD+</span>
+        <span class="legend__item"><span class="legend__swatch" style="background:var(--down)"></span>Down candle / MACD−</span>
+        <span class="legend__item"><span class="legend__swatch" style="background:var(--bb)"></span>Bollinger</span>
+        <span class="legend__item"><span class="legend__swatch" style="background:var(--rsi)"></span>RSI</span>
+        <span class="legend__item"><span class="legend__mark">▲▼</span>Engine entry / exit</span>
+      </div>
+      <p class="empty" id="chartEmpty" hidden></p>
+    </div>
+  </section>
+
+ </div><!-- /col--right -->
+
+  <!-- ---------- Journal + engine health ---------- -->
+  <section class="card card--journal" aria-labelledby="h-journal">
+    <div class="card__head">
+      <h2 id="h-journal">Journal &amp; engine health</h2>
+      <span class="card__note mono" id="journalNote"></span>
+    </div>
+    <div class="card__body card__body--flush">
+      <div class="health" id="health"></div>
+
+      <div class="subhead">
+        <h3>Executions</h3>
+        <span class="subhead__note mono" id="execNote"></span>
+      </div>
+      <div class="tablewrap">
+        <table class="tbl tbl--dense" id="execTable">
+          <thead><tr>
+            <th>Filled</th><th>Symbol</th><th>Side</th><th class="num">Qty</th>
+            <th class="num">Entry</th><th class="num">Exit</th><th class="num">Realized P&amp;L</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty" id="execEmpty" hidden>No executed orders yet.</p>
+
+      <div class="subhead">
+        <h3>Signal journal</h3>
+        <span class="subhead__note mono">every decision, including the ones that fired nothing</span>
+      </div>
+      <div class="tablewrap tablewrap--scroll">
+        <table class="tbl tbl--dense" id="journalTable">
+          <thead><tr><th>Time</th><th>Event</th><th>Symbol</th><th>Detail</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>Read-only viewer — this page cannot place, size, or cancel an order.</span>
+  <span id="footNote" class="mono"></span>
+</footer>
+
+<script src="/vendor/lightweight-charts.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

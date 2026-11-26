@@ -1,0 +1,57 @@
+name: Keep schedules alive
+
+# GitHub disables every scheduled workflow of a PUBLIC repository once the
+# repository has had no activity for 60 days. For the public portfolio that
+# would freeze its figures silently (the site then says "not updated since").
+#
+# Once a week this reads the date of the newest commit on main and, ONLY when
+# it is 45 days old or more, adds one empty commit to main through the API:
+# no checkout, no third-party code, no file change. A repository in use never
+# gets one. Re-enabling a workflow through the API does not reset GitHub's
+# clock (reported by keep-alive tools that tried it), a commit does.
+#
+# If the commit is refused (say main requires pull requests), this job fails,
+# and GitHub emails whoever last changed the cron line below: push any commit
+# to main within the next two weeks. docs/public-portfolio.md has the details.
+
+on:
+  schedule:
+    - cron: "41 5 * * 1" # Mondays 05:41 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    name: Commit to main after 45 idle days
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # the one empty commit; nothing else
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      IDLE_DAYS: "45"
+    steps:
+      - name: Check the newest commit on main
+        run: |
+          set -euo pipefail
+          info=$(gh api "repos/${REPO}/commits/main" --jq '.sha + " " + .commit.committer.date')
+          head=${info%% *}
+          committed=${info#* }
+          idle=$(( ($(date -u +%s) - $(date -u -d "$committed" +%s)) / 86400 ))
+          if [ "$idle" -lt "$IDLE_DAYS" ]; then
+            echo "The newest commit on main is ${idle} day(s) old: nothing to do."
+            exit 0
+          fi
+          tree=$(gh api "repos/${REPO}/git/commits/${head}" --jq '.tree.sha')
+          commit=$(gh api --method POST "repos/${REPO}/git/commits" \
+            -f message="Keep the scheduled workflows enabled (${idle} days without a commit)" \
+            -f tree="$tree" -f "parents[]=$head" --jq '.sha')
+          gh api --method PATCH "repos/${REPO}/git/refs/heads/main" -f sha="$commit" -F force=false --silent
+          echo "::notice title=Keep-alive::main had no commit for ${idle} days; added an empty commit."

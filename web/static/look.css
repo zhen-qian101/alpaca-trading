@@ -1,0 +1,106 @@
+/* Look review — the presenter's outfit for one session, before it is video.
+   Rides the terminal's palette and .card/.btn/.badge vocabulary; only the
+   things the main grid has no equivalent for live here. */
+
+.lookmain { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ---------- the verdict bar ----------
+   Deliberately the first thing on the page and deliberately a full-width bar
+   rather than a badge: the question a reviewer arrives with is "what will
+   tonight's video show", and that answer should not have to be inferred from
+   the presence or absence of a green dot somewhere. */
+.verdict {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: 5px;
+}
+.verdict--ok   { border-left-color: var(--up); }
+.verdict--wait { border-left-color: var(--warn); }
+.verdict--none { border-left-color: var(--text-faint); }
+.verdict__text { font-size: 14px; line-height: 1.5; }
+.verdict__text strong { font-weight: 600; }
+.verdict__actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+.btn--primary {
+  color: var(--bg); background: var(--up); border-color: var(--up);
+  font-weight: 600;
+}
+.btn--primary:hover { color: var(--bg); background: #46c9a3; border-color: #46c9a3; }
+
+/* ---------- layout ---------- */
+.lookgrid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.card--wide { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+  .lookgrid { grid-template-columns: 1fr; }
+  .card--wide { grid-column: 1; }
+}
+
+/* ---------- image panes ----------
+   Checkerboard behind the art: these are renders on a near-white studio wall,
+   and on a dark surface a plain background makes it impossible to tell where
+   the plate ends and the page begins. */
+.shot {
+  position: relative;
+  background-color: #1a1f2b;
+  background-image:
+    linear-gradient(45deg, #151a24 25%, transparent 25%, transparent 75%, #151a24 75%),
+    linear-gradient(45deg, #151a24 25%, transparent 25%, transparent 75%, #151a24 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 220px;
+}
+.shot img { display: block; width: 100%; height: auto; }
+.shot__empty { color: var(--text-faint); font-size: 12px; padding: 40px 0; }
+
+/* The face pane crops rather than scales: the img is blown up and the box
+   clips it, so the pixels shown are real pixels, not a smooth resample that
+   would hide exactly the softness worth catching.
+
+   THE CROP IS OFF-CENTRE ON PURPOSE. The presenter stands in the RIGHT third
+   of a 16:9 stage — the left two-thirds is the slide area — so a centred zoom
+   magnifies blank wall and shows no face at all. These are the same numbers
+   used to compare his 08-18 and 08-19 faces by hand: a window 22% of the frame
+   wide and 36% tall, starting 65.5% across. Percentages, not pixels, so it
+   survives the frame being re-rendered at another resolution.
+
+     width 100/22   = 454.5%  -> the window fills the pane
+     translateX -65.5% of the IMAGE's own width -> that window is what shows
+     aspect 0.22*16 / 0.36*9  = 1.086 -> the pane is exactly the window's shape */
+.shot--face { overflow: hidden; position: relative; aspect-ratio: 1.086; min-height: 0; }
+.shot--face img {
+  position: absolute; top: 0; left: 0;
+  width: 454.5%; max-width: none;
+  transform: translateX(-65.5%);
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* The plate is a tall portrait render; left to itself it makes this row twice
+   the height of the face pane beside it. */
+.shot--plate { max-height: 620px; }
+.shot--plate img { width: auto; max-height: 620px; }
+
+/* ---------- copy ---------- */
+.rationale {
+  margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: var(--text);
+  border-left: 2px solid var(--border); padding-left: 12px; font-style: italic;
+}
+.stats--look { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 12px; }
+.outfit summary {
+  cursor: pointer; font-size: 11px; color: var(--text-muted);
+  padding: 4px 0; user-select: none;
+}
+.outfit summary:hover { color: var(--text); }
+.outfit__text {
+  margin: 6px 0 0; font-size: 11px; line-height: 1.6; color: var(--text-muted);
+  background: var(--surface-raised); border: 1px solid var(--border);
+  border-radius: 4px; padding: 10px;
+}
+
+select.btn { padding-right: 6px; }

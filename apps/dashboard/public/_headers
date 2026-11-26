@@ -1,0 +1,19 @@
+# Security headers for the SPA's STATIC ASSETS (index.html, /assets/*).
+# Workers Static Assets reads this file from the build output, so it belongs
+# at apps/dashboard/public/_headers (Vite copies public/ into dist/client/).
+# It does not apply to Worker responses: /api/* and /media/* set their own
+# headers in worker/http.ts. It is not applied by `vite dev`.
+#
+# style-src allows 'unsafe-inline' only because lightweight-charts injects one
+# <style> element for its attribution logo. If the SPA sets
+# `layout: { attributionLogo: false }` (and credits TradingView elsewhere, as
+# the library's licence asks), drop 'unsafe-inline'.
+# If the SPA loads web fonts from Google, add https://fonts.googleapis.com to
+# style-src and https://fonts.gstatic.com to font-src.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()

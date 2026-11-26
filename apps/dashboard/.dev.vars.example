@@ -1,0 +1,36 @@
+# Local development only. Copy to .dev.vars (gitignored) to use it:
+#
+#     cp .dev.vars.example .dev.vars
+#
+# WARNING: DEV_AUTH_BYPASS=1 switches OFF the Cloudflare Access JWT check, so
+# /api and /media requests are served without authentication. Put it ONLY in
+# .dev.vars. Never set it in wrangler.jsonc, as a deployed variable or secret,
+# or in CI.
+#
+# The bypass applies only when ALL of these hold (worker/auth.ts,
+# worker/devPeer.ts, devserver/peerStamp.ts):
+#   - the value is exactly "1";
+#   - ACCESS_TEAM_DOMAIN and ACCESS_AUD are both unset (once they are set, the
+#     bypass is ignored and the real JWT check runs);
+#   - the request came through `pnpm dev` (vite dev) from THIS machine. The
+#     dev server makes a random key per process, gives it to the Worker as
+#     DEV_PEER_KEY, and stamps every request with that key and the
+#     connection's TCP peer address, over anything the client sent. The
+#     Worker wants the key AND a loopback peer, so a dev server started with
+#     --host still refuses every other device on the network, whatever Host
+#     header it sends. `wrangler dev` reads this file too but has no key, and
+#     `pnpm preview` serves a build whose .dev.vars copy has this variable
+#     stripped out, so the bypass never applies in either;
+#   - nothing relayed it: no X-Forwarded-For, Forwarded, X-Real-IP or
+#     True-Client-IP header, and no CF-Connecting-IP other than loopback, so a
+#     tunnel or reverse proxy on this machine cannot hand it to the internet;
+#   - the request's host is loopback (localhost, 127.0.0.1, [::1] or
+#     *.localhost), so it can never open a *.workers.dev hostname.
+#
+# Responses served under the bypass carry the header X-Dev-Auth-Bypass: 1.
+DEV_AUTH_BYPASS=1
+
+# Optional: exercise the real JWT path locally instead of bypassing it.
+# Setting both turns the bypass above off.
+# ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
+# ACCESS_AUD=<application audience tag>

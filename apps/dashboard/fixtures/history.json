@@ -1,0 +1,180 @@
+{
+  "generated_at": "2026-03-04T22:31:07+00:00",
+  "current": "2026-03-04",
+  "briefings": [
+    {
+      "date": "2026-03-04",
+      "generated_at": "2026-03-04T22:30:55+00:00",
+      "briefing_file": "post-market-recap_2026-03-04.mp4",
+      "duration_s": 141.6,
+      "mode": "factual",
+      "label": "Post-market recap",
+      "renderer": null,
+      "title": "Semis carry a narrow tape higher",
+      "model": null,
+      "images": false,
+      "subtitles": true,
+      "director": "demo-director-model",
+      "voice": "en-US-DemoNeural",
+      "clips": [
+        {
+          "symbol": "OVERVIEW",
+          "clip_file": "clip_OVERVIEW.mp4",
+          "clip_file_zh": "clip_OVERVIEW_zh.mp4",
+          "duration_s": 34.2,
+          "bias": null,
+          "mood": "steady",
+          "headline": "Narrow tape"
+        },
+        {
+          "symbol": "DESK",
+          "clip_file": "clip_DESK.mp4",
+          "duration_s": 28.9,
+          "bias": null,
+          "mood": "candid",
+          "headline": "The account, live"
+        },
+        {
+          "symbol": "ACME",
+          "clip_file": "clip_ACME.mp4",
+          "clip_file_zh": "clip_ACME_zh.mp4",
+          "duration_s": 41.5,
+          "bias": "long",
+          "mood": "upbeat",
+          "headline": "Guide-up holds"
+        },
+        {
+          "symbol": "NOVA",
+          "clip_file": "clip_NOVA.mp4",
+          "clip_file_zh": "clip_NOVA_zh.mp4",
+          "duration_s": 37.0,
+          "bias": "flat",
+          "mood": "patient",
+          "headline": "Waiting on 57.50"
+        }
+      ],
+      "briefing_file_zh": "post-market-recap_2026-03-04_zh.mp4",
+      "voice_zh": "zh-CN-DemoNeural",
+      "title_zh": "半导体独撑大盘",
+      "title_zh_check": {
+        "model": "demo-check-model",
+        "checked": true,
+        "ok": true,
+        "errors": [],
+        "rewritten": false
+      },
+      "cover_head": {
+        "title": "Semis carry a narrow tape higher",
+        "keywords": [
+          "semis",
+          "breadth"
+        ],
+        "art": "a paper boat riding a rising tide"
+      },
+      "cover_file": "post-market-recap_2026-03-04_cover.png",
+      "cover_file_zh": "post-market-recap_2026-03-04_cover_zh.png",
+      "kind": "video",
+      "slot": "video",
+      "briefing": "/media/2026-03-04/video/post-market-recap_2026-03-04.mp4?v=ddcdc1b7b20e",
+      "briefing_zh": "/media/2026-03-04/video/post-market-recap_2026-03-04_zh.mp4?v=ddcdc1b7b20e",
+      "cover": "/media/2026-03-04/video/post-market-recap_2026-03-04_cover.png?v=5fcaeb34b00d",
+      "cover_zh": "/media/2026-03-04/video/post-market-recap_2026-03-04_cover_zh.png?v=5fcaeb34b00d",
+      "local": false
+    },
+    {
+      "date": "2026-03-04",
+      "generated_at": "2026-03-04T17:12:40+00:00",
+      "briefing_file": "midday-briefing_2026-03-04.mp4",
+      "duration_s": 47.4,
+      "mode": "story",
+      "label": "Midday briefing",
+      "renderer": "hyperframes",
+      "title": "Midday: semis lead",
+      "model": null,
+      "images": false,
+      "subtitles": true,
+      "director": "demo-director-model",
+      "voice": "en-US-DemoNeural",
+      "clips": [
+        {
+          "symbol": "OVERVIEW",
+          "clip_file": "clip_OVERVIEW.mp4",
+          "duration_s": 22.0,
+          "bias": null,
+          "headline": "Midday: semis lead"
+        },
+        {
+          "symbol": "ORBT",
+          "clip_file": "clip_ORBT.mp4",
+          "duration_s": 25.4,
+          "bias": "long",
+          "headline": "Second candidate"
+        }
+      ],
+      "cover_head": {
+        "title": "Midday: semis lead",
+        "keywords": [
+          "semis",
+          "breadth"
+        ],
+        "art": "a paper boat riding a rising tide"
+      },
+      "cover_file": "midday-briefing_2026-03-04_cover.png",
+      "kind": "slideshow",
+      "slot": "slideshow-midday-briefing",
+      "briefing": "/media/2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04.mp4?v=ddcdc1b7b20e",
+      "cover": "/media/2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04_cover.png?v=5fcaeb34b00d",
+      "local": false
+    },
+    {
+      "date": "2026-03-01",
+      "generated_at": "2026-03-01T23:05:12+00:00",
+      "briefing_file": "weekend-recap_2026-03-01.mp4",
+      "duration_s": 100.5,
+      "mode": "story",
+      "label": "Weekend recap",
+      "renderer": "wan",
+      "title": "The tortoise and the hare, market edition",
+      "model": null,
+      "images": false,
+      "subtitles": true,
+      "director": "demo-director-model",
+      "voice": "en-US-DemoNeural",
+      "clips": [
+        {
+          "symbol": "The Tortoise",
+          "clip_file": "weekend-recap_2026-03-01.mp4",
+          "start_s": 0.0,
+          "duration_s": 48.0,
+          "bias": null,
+          "headline": "The tortoise counts its gains.",
+          "file": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e"
+        },
+        {
+          "symbol": "The Hare",
+          "clip_file": "weekend-recap_2026-03-01.mp4",
+          "start_s": 48.0,
+          "duration_s": 52.5,
+          "bias": null,
+          "headline": "The hare sprints and stumbles.",
+          "file": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e"
+        }
+      ],
+      "briefing_file_zh": "weekend-recap_2026-03-01_zh.mp4",
+      "voice_zh": "zh-CN-DemoNeural",
+      "title_zh": "龟兔赛跑：市场版",
+      "title_zh_check": {
+        "model": "demo-check-model",
+        "checked": true,
+        "ok": true,
+        "errors": [],
+        "rewritten": false
+      },
+      "kind": "video",
+      "slot": "video",
+      "briefing": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e",
+      "briefing_zh": "/media/2026-03-01/video/weekend-recap_2026-03-01_zh.mp4?v=ddcdc1b7b20e",
+      "local": false
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+# Cap the RTX 5090 at 400 W on every boot.
+#
+# WHY. On 2026-10-28 the card fell off the PCIe bus (Xid 79) on BOTH LTX
+# renders that day, each time ~27s into full-power stage-1 sampling, on two
+# different drivers and kernels. That is power delivery under sustained peak
+# draw, not software. The card ships at 575 W; 400 W is its own floor
+# (`nvidia-smi -q -d POWER` -> Min Power Limit) and costs ~5-10% render time.
+#
+# WHY A UNIT. `nvidia-smi -pl` does not survive a reboot, and this box reboots
+# unattended (kernel bumps, the 17:22 hard death the same day). A cap applied
+# by hand is gone the next morning, and the 20:00 ET recap runs unattended.
+#
+# If the driver is missing (a kernel bump without its prebuilt module, see the
+# gpu-dies-on-kernel-bump memory) nvidia-smi fails and so does this unit. That
+# is harmless: there is no GPU to protect.
+#
+# Install (needs sudo; also applies the cap now):
+#   sudo cp deploy/nvidia-powercap.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now nvidia-powercap.service
+# Verify:   nvidia-smi --query-gpu=power.limit,persistence_mode --format=csv
+# Remove:   sudo systemctl disable --now nvidia-powercap.service
+#           (the limit stays until reboot or `sudo nvidia-smi -pl 575`)
+
+[Unit]
+Description=Cap RTX 5090 power at 400 W (Xid 79 under full LTX load)
+After=nvidia-persistenced.service systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=60
+ExecStart=/usr/bin/nvidia-smi -pm 1
+ExecStart=/usr/bin/nvidia-smi -pl 400
+
+[Install]
+WantedBy=multi-user.target

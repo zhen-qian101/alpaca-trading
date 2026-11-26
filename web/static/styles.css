@@ -1,0 +1,254 @@
+/* Alpaca Terminal — dashboard styles.
+   Palette, fonts and candle colours are deliberately identical to the Signal
+   Terminal artifact (backtest/chart_view.py) so the two read as one system. */
+
+@font-face {
+  font-family: 'JBMono';
+  src: url('/vendor/jbmono_400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Plex';
+  src: url('/vendor/plex_400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0e14;
+  --surface: #12161f;
+  --surface-raised: #171c28;
+  --border: #232838;
+  --text: #e7eaf0;
+  --text-muted: #7c889c;
+  --text-faint: #4d5568;
+  --up: #34b892;
+  --down: #e2596b;
+  --bb: #7b8fff;
+  --rsi: #f2a93b;
+  --accent: #f2a93b;
+  --warn: #fab219;
+  --crit: #d03b3b;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Plex', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.mono { font-family: 'JBMono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+::selection { background: var(--accent); color: #14110a; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 20;
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: baseline; gap: 6px; }
+.brand__mark { font-family: 'JBMono', monospace; font-weight: 700; font-size: 15px; letter-spacing: 0.02em; }
+.brand__sub { font-size: 11px; color: var(--text-faint); letter-spacing: 0.08em; text-transform: uppercase; }
+.topbar__status { display: flex; gap: 8px; flex-wrap: wrap; }
+.topbar__right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.stamp { font-size: 11px; color: var(--text-faint); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'JBMono', monospace; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 3px;
+  border: 1px solid var(--border); background: var(--surface-raised); color: var(--text-muted);
+}
+.badge--ok   { color: var(--up);   border-color: rgba(52,184,146,0.4);  background: rgba(52,184,146,0.10); }
+.badge--warn { color: var(--warn); border-color: rgba(250,178,25,0.4);  background: rgba(250,178,25,0.10); }
+.badge--bad  { color: var(--down); border-color: rgba(226,89,107,0.4);  background: rgba(226,89,107,0.10); }
+.badge--muted { color: var(--text-faint); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+.btn {
+  font-family: 'JBMono', monospace; font-size: 11px;
+  color: var(--text-muted); background: var(--surface-raised);
+  border: 1px solid var(--border); border-radius: 3px;
+  padding: 4px 10px; cursor: pointer;
+}
+.btn:hover { color: var(--text); border-color: var(--text-faint); }
+a.btn { text-decoration: none; display: inline-block; }
+.btn[aria-busy="true"] { opacity: 0.5; cursor: progress; }
+
+/* ---------- layout ---------- */
+/* Two columns that pack independently, rather than a 12-col row grid: the tall
+   portfolio card would otherwise set the row height and strand a large void
+   under the short positions card whenever the account is flat. */
+.grid {
+  display: grid; gap: 12px; padding: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  align-items: start;
+}
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card--journal { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .card--journal { grid-column: 1; }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  min-width: 0;            /* let wide tables scroll inside, never push the page */
+  overflow: hidden;
+}
+.card__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+}
+.card__note { font-size: 10px; color: var(--text-faint); text-align: right; }
+.card__body { padding: 14px; }
+.card__body--flush { padding: 0; }
+
+/* ---------- hero + stats ---------- */
+.hero { margin-bottom: 14px; }
+.hero__label { font-size: 11px; color: var(--text-muted); }
+.hero__value {
+  font-family: 'Plex', sans-serif;   /* proportional figures — a hero number, not a column */
+  font-size: 48px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em;
+  margin: 2px 0 4px;
+}
+.hero__delta { font-family: 'JBMono', monospace; font-size: 13px; color: var(--text-muted); }
+.up { color: var(--up); } .down { color: var(--down); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.stat { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; }
+.stat__label { font-size: 10px; color: var(--text-muted); }
+.stat__value { font-size: 14px; margin-top: 2px; }
+
+/* ---------- meter ---------- */
+.meter__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+.meter__label { font-size: 11px; color: var(--text-muted); }
+.meter__val { font-size: 12px; }
+.meter__track { height: 6px; border-radius: 3px; background: rgba(52,184,146,0.15); overflow: hidden; }
+.meter__fill { height: 100%; width: 0; border-radius: 3px; background: var(--up); transition: width 0.3s ease, background 0.3s ease; }
+.meter__fill--warn { background: var(--warn); }
+.meter__fill--crit { background: var(--crit); }
+.meter__foot { margin-top: 6px; font-size: 10px; color: var(--text-faint); }
+
+/* ---------- tables ---------- */
+.tablewrap { overflow-x: auto; }
+.tablewrap--scroll { max-height: 320px; overflow-y: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th {
+  position: sticky; top: 0; z-index: 1;
+  text-align: left; font-weight: 500; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-faint); background: var(--surface);
+  padding: 7px 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.tbl td { padding: 7px 12px; border-bottom: 1px solid rgba(35,40,56,0.5); white-space: nowrap; }
+.tbl tbody tr:hover td { background: var(--surface-raised); }
+.tbl .num { text-align: right; font-family: 'JBMono', monospace; font-variant-numeric: tabular-nums; }
+.tbl--dense td, .tbl--dense th { padding: 5px 12px; }
+.sym { font-family: 'JBMono', monospace; font-weight: 500; }
+.muted { color: var(--text-faint); }
+.empty { padding: 22px 14px; text-align: center; color: var(--text-faint); font-size: 12px; margin: 0; }
+
+.tag {
+  font-family: 'JBMono', monospace; font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px; border: 1px solid var(--border); color: var(--text-muted);
+}
+.tag--long { color: var(--up); border-color: rgba(52,184,146,0.4); background: rgba(52,184,146,0.10); }
+.tag--flat { color: var(--text-faint); }
+.tag--short { color: var(--down); border-color: rgba(226,89,107,0.4); background: rgba(226,89,107,0.10); }
+.tag--held { color: var(--accent); border-color: rgba(242,169,59,0.45); background: rgba(242,169,59,0.12); }
+.pri { font-family: 'JBMono', monospace; color: var(--text-faint); }
+.pri--live { color: var(--accent); font-weight: 500; }
+
+/* ---------- notes ---------- */
+.notes { border-top: 1px solid var(--border); }
+.notes summary {
+  padding: 8px 14px; cursor: pointer; font-size: 11px; color: var(--text-muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.notes summary:hover { color: var(--text); }
+.notes__body {
+  padding: 0 14px 12px; font-size: 11.5px; color: var(--text-muted); line-height: 1.6;
+  max-height: 260px; overflow-y: auto;
+}
+.notes__body p { margin: 0 0 8px; }
+.notes__key { color: var(--accent); font-family: 'JBMono', monospace; font-size: 10px; }
+
+/* ---------- charts ---------- */
+.symbols {
+  display: flex; gap: 2px; padding: 6px 8px;
+  border-bottom: 1px solid var(--border); background: var(--surface-raised);
+  overflow-x: auto;
+}
+.symbols::-webkit-scrollbar { height: 4px; }
+.symbols::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.sym-btn {
+  font-family: 'JBMono', monospace; font-size: 11px;
+  padding: 4px 9px; border-radius: 3px; border: 1px solid transparent;
+  background: transparent; color: var(--text-muted); cursor: pointer; white-space: nowrap;
+}
+.sym-btn:hover { background: var(--surface); color: var(--text); }
+.sym-btn[aria-pressed="true"] { background: rgba(242,169,59,0.12); color: var(--accent); border-color: rgba(242,169,59,0.35); }
+
+.chartstack { display: flex; flex-direction: column; }
+.pane { position: relative; border-bottom: 1px solid var(--border); }
+/* Size the chart HOSTS by id, not with `.pane--price > div`: that also matched
+   the absolutely-positioned .ohlc legend, stretching it to 300px tall so its
+   translucent background tinted the left ~470px of the chart — the pane looked
+   split into a dark half and a bright half. */
+#chartPrice { height: 300px; }
+#chartRsi, #chartMacd { height: 92px; }
+.pane__tag {
+  position: absolute; top: 5px; left: 8px; z-index: 3;
+  font-size: 9.5px; letter-spacing: 0.05em; color: var(--text-faint);
+  background: rgba(11,14,20,0.72); padding: 1px 5px; border-radius: 2px; pointer-events: none;
+}
+.ohlc {
+  position: absolute; top: 5px; left: 8px; z-index: 3;
+  font-size: 10.5px; color: var(--text-muted);
+  background: rgba(11,14,20,0.72); padding: 3px 7px; border-radius: 2px;
+  pointer-events: none; display: flex; gap: 9px; flex-wrap: wrap;
+}
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 14px; font-size: 10.5px; color: var(--text-faint); }
+.legend__item { display: inline-flex; align-items: center; gap: 5px; }
+.legend__swatch { width: 9px; height: 9px; border-radius: 2px; }
+.legend__mark { font-size: 8px; letter-spacing: -1px; }
+
+/* ---------- section sub-heading ---------- */
+.subhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 9px 14px 6px; border-top: 1px solid var(--border);
+}
+.subhead h3 {
+  margin: 0; font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.subhead__note { font-size: 10px; color: var(--text-faint); }
+
+/* ---------- engine health ---------- */
+.health { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'JBMono', monospace; font-size: 10px;
+  padding: 3px 7px; border-radius: 3px;
+  border: 1px solid var(--border); background: var(--surface-raised); color: var(--text-muted);
+}
+.chip--ok { color: var(--up); border-color: rgba(52,184,146,0.3); }
+.chip--lag { color: var(--warn); border-color: rgba(250,178,25,0.35); }
+.chip__val { color: var(--text-faint); }
+
+/* ---------- footer ---------- */
+.foot {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px 20px; font-size: 10.5px; color: var(--text-faint);
+  border-top: 1px solid var(--border); margin-top: 4px;
+}

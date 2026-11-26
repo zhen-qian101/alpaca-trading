@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "typescript",
+    "oxc",
+    "jsx-a11y"
+  ],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "react/exhaustive-deps": "warn",
+    // A scrollable table region takes tabindex="0" on purpose, so keyboard
+    // users can scroll it (WCAG 2.1.1); jsx-a11y cannot see that it scrolls.
+    "jsx-a11y/no-noninteractive-tabindex": "off",
+    // role="region" / "group" / "img" on a div are valid ARIA; the semantic
+    // tag it suggests does not fit (an <img> cannot host a canvas chart).
+    "jsx-a11y/prefer-tag-over-role": "off"
+  },
+  "ignorePatterns": [
+    "dist"
+  ]
+}

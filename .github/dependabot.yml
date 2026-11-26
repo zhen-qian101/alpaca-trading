@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Pinned action SHAs in .github/workflows go stale; Dependabot bumps the SHA
+  # and its version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The cloud dashboard (apps/dashboard, pnpm). One grouped PR a week, and only
+  # for releases at least 7 days old, the same supply-chain delay pnpm applies.
+  - package-ecosystem: npm
+    directory: /apps/dashboard
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dashboard:
+        patterns: ["*"]
+
+  # The public portfolio site (apps/portfolio, pnpm), on the same terms.
+  - package-ecosystem: npm
+    directory: /apps/portfolio
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      portfolio:
+        patterns: ["*"]

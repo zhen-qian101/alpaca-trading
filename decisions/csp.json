@@ -1,0 +1,17 @@
+{
+  "_comment": "OPERATOR POLICY for the weekly cash-secured put (relay/csp_manager.py). Deliberately NOT in decisions.json, which the research harness rewrites wholesale several times a day \u2014 a csp block placed there was deleted by the 09:15 ET cron on 2026-08-27. LIVE SINCE 2026-09-01: shadow is false, so the weekly run SENDS a real sell-to-open. It ran in shadow from 2026-08-27 to 2026-08-31 \u2014 originally forced (the old $4,848 account could not cover ~$10,350 of collateral), then a deliberate choice once the account held $100,000. The operator armed it knowing the measured expectation: read the module docstring in relay/csp_manager.py first \u2014 at $100k the sleeve's contribution is slightly NEGATIVE on the study's terms, because the pledge costs the equity book ~$736/contract/yr in foregone exposure against $59-$265 of premium, and the real bet is that the equity backtest's 32.5% CAGR is optimistic. TO STOP TRADING set shadow back to true (it keeps choosing and journalling, sends nothing); to stop entirely set enabled false. Both take effect at the next run \u2014 the cron re-reads this file every time, nothing to restart. Strike is a FIXED 22-28% OTM distance, never a delta or a vol-derived probability (the vol-targeted variant tests at -5.9% CAGR / -82.7% drawdown because volatility clusters). min_credit_frac is the premium floor: breakeven is an IV of ~106-108% against SOXL's 99.8% median realized vol, so a week that does not pay enough is a week not to sell. See decisions/soxl_csp_study_2026-08-27.md.",
+  "enabled": true,
+  "shadow": false,
+  "underlying": "SOXL",
+  "min_otm": 0.22,
+  "max_otm": 0.28,
+  "dte_min": 5,
+  "dte_max": 9,
+  "contracts": "auto",
+  "min_credit_frac": 0.0035,
+  "max_spread_frac": 0.25,
+  "close_reserve": 0.15,
+  "max_contracts": 1,
+  "_comment_sizing": "THE RESERVE IS THE CAPITAL SPLIT. reserve_frac x equity is the sleeve's money: the put's collateral while flat, and the assigned shares while it works them off (it sells them at the very next weekly run \u2014 no covered calls, no stop; operator's choice 2026-08-28 from the wheel backtest, where puts-only-sold-within-a-week was the best risk-adjusted form on real 2024-26 fills at +17%/yr and -24% max drawdown, and every covered-call and stop variant was worse). The share book sizes off equity minus this reserve (sigengine.engine.fire_event), so the two books never claim the same dollars and the share book is never blocked by the sleeve. 'auto' sells min(reserve / (collateral x 1.15), max_contracts) contracts every week; 20% of $100k is ~$20k, which covers one contract's collateral PLUS one assignment's shares (~$16k today), so a put can be sold even in the week the shares are being worked off. To run two contracts continuously, raise reserve_frac to ~0.32 and max_contracts to 2.",
+  "reserve_frac": 0.2
+}

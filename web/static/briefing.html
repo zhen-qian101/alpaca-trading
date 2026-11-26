@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Alpaca Research Desk</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🎬</text></svg>">
+<style>
+  /* --- Research Desk: a broadcast "rundown" around the briefing video ---------
+     Signature: the ordered running order (00/01/02…) with an ON-AIR marker on
+     the playing scene. Numbering earns its place — scenes play in sequence. */
+  .desk { max-width: 1240px; margin: 0 auto; padding: 26px 18px 72px; }
+
+  .slate { display: flex; align-items: flex-end; justify-content: space-between;
+           gap: 20px; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 22px; }
+  .slate__eyebrow { font-family: 'JBMono', monospace; font-size: 11px; letter-spacing: .34em;
+                    text-transform: uppercase; color: var(--accent); }
+  .slate__title { font-family: 'Plex', sans-serif; font-weight: 700; font-size: 40px;
+                  line-height: 1.02; letter-spacing: -.015em; margin-top: 8px; color: var(--text); }
+  .slate__title .mut { color: var(--text-faint); }
+  .datepick { display: flex; align-items: center; gap: 9px; }
+  .datepick label { font-family: 'JBMono', monospace; font-size: 10px; letter-spacing: .1em;
+                    text-transform: uppercase; color: var(--text-muted); }
+  select.date { font-family: 'JBMono', monospace; font-size: 12px; color: var(--text);
+                background: var(--surface-raised); border: 1px solid var(--border);
+                border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+  .tabs { display: inline-flex; gap: 2px; background: var(--surface-raised);
+          border: 1px solid var(--border); border-radius: 5px; padding: 2px; }
+  .tab { font-family: 'JBMono', monospace; font-size: 10px; letter-spacing: .1em;
+         text-transform: uppercase; color: var(--text-muted); background: transparent;
+         border: 0; border-radius: 3px; padding: 5px 12px; cursor: pointer; }
+  .tab.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .tab:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
+
+  .stage { display: grid; grid-template-columns: minmax(0,1fr) 358px; gap: 22px; align-items: start; }
+  @media (max-width: 940px) { .stage { grid-template-columns: 1fr; } }
+
+  .nowtitle { font-family: 'Plex', sans-serif; font-weight: 600; font-size: 15px; color: var(--text-muted);
+              margin: 0 2px 10px; min-height: 1.3em; }
+  .nowtitle b { color: var(--text); font-weight: 700; }
+  .screen { position: relative; background: #000; border: 1px solid var(--border);
+            border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px -30px #000; }
+  .screen video { display: block; width: 100%; aspect-ratio: 16/9; background: #000; }
+
+  .vtitle { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin: 14px 2px 0; }
+  .vtitle__head { font-family: 'Plex', sans-serif; font-weight: 700; font-size: 22px;
+                  line-height: 1.15; letter-spacing: -.01em; color: var(--text); }
+  .vtitle__ed { font-family: 'JBMono', monospace; font-size: 10px; letter-spacing: .14em;
+                text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 0; margin: 16px 0 0; border: 1px solid var(--border);
+          border-radius: 8px; overflow: hidden; }
+  .meta > div { flex: 1 1 20%; min-width: 120px; padding: 11px 14px;
+                border-right: 1px solid var(--border); }
+  .meta > div:last-child { border-right: 0; }
+  .meta dt { font-family: 'JBMono', monospace; font-size: 9px; letter-spacing: .12em;
+             text-transform: uppercase; color: var(--text-faint); }
+  .meta dd { font-family: 'JBMono', monospace; font-size: 13px; color: var(--text); margin-top: 4px;
+             font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .rundown__head { display: flex; align-items: baseline; justify-content: space-between; margin: 2px 2px 12px; }
+  .rundown__head h2 { font-family: 'JBMono', monospace; font-size: 11px; letter-spacing: .2em;
+                      text-transform: uppercase; color: var(--text-muted); }
+  .rundown__head span { font-family: 'JBMono', monospace; font-size: 10px; color: var(--text-faint); }
+  .row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px;
+         width: 100%; text-align: left; background: transparent; border: 0;
+         border-top: 1px solid var(--border); padding: 13px 6px; cursor: pointer; font: inherit;
+         transition: background .12s ease; }
+  .row:last-child { border-bottom: 1px solid var(--border); }
+  .row:hover { background: var(--surface); }
+  .row.active { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .row__no { font-family: 'JBMono', monospace; font-size: 12px; color: var(--text-faint); font-weight: 700; }
+  .row.active .row__no { color: var(--accent); }
+  .row__name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .row__sym { font-family: 'JBMono', monospace; font-weight: 700; font-size: 14px; color: var(--text);
+              letter-spacing: .02em; }
+  .row__hl { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden;
+             text-overflow: ellipsis; max-width: 210px; }
+  .row__dur { font-family: 'JBMono', monospace; font-size: 12px; color: var(--text-muted);
+              font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; font-family: 'JBMono', monospace; font-size: 9px; letter-spacing: .08em;
+          text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid currentColor; }
+  .chip--long { color: var(--up); } .chip--short { color: var(--down); }
+  .chip--flat { color: var(--accent); } .chip--none { color: var(--text-faint); }
+  .onair { font-family: 'JBMono', monospace; font-size: 8px; letter-spacing: .14em; color: var(--accent);
+           border: 1px solid var(--accent); border-radius: 3px; padding: 1px 5px; opacity: 0; }
+  .row.active .onair { opacity: 1; }
+
+  .empty { color: var(--text-muted); padding: 64px 8px; text-align: center; font-size: 14px; }
+  a.back { color: var(--text-muted); text-decoration: none; font-size: 12px; font-family: 'JBMono', monospace; }
+  a.back:hover { color: var(--text); }
+  .fadein { animation: fade .5s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .fadein { animation: none; } .row { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand__mark">ALPACA</span>
+    <span class="brand__sub">research desk</span>
+  </div>
+  <div class="topbar__right">
+    <a class="back" href="/">← terminal</a>
+    <button id="refreshBtn" class="btn" title="Reload the latest briefing">refresh</button>
+  </div>
+</header>
+
+<div class="desk">
+  <div id="content" hidden>
+    <div class="slate">
+      <div>
+        <div class="slate__eyebrow" id="eyebrow">Research Desk</div>
+        <h1 class="slate__title">Daily Briefing <span class="mut" id="titleDate"></span></h1>
+      </div>
+      <div class="datepick">
+        <div class="tabs" id="tabs">
+          <button type="button" class="tab" data-kind="video">Video</button>
+          <button type="button" class="tab" data-kind="slideshow">Slideshow</button>
+        </div>
+        <label for="dateSel">Session</label>
+        <select id="dateSel" class="date"></select>
+        <button type="button" id="langBtn" class="btn" title="Switch narration language" hidden>中文</button>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="fadein">
+        <p class="nowtitle" id="nowtitle"></p>
+        <div class="screen"><video id="video" controls preload="metadata" playsinline></video></div>
+        <div class="vtitle" id="vtitle" hidden>
+          <span class="vtitle__head" id="vtitleHead"></span>
+          <span class="vtitle__ed" id="vtitleEd"></span>
+        </div>
+        <dl class="meta" id="meta"></dl>
+      </div>
+      <div class="fadein">
+        <div class="rundown__head"><h2>Running order</h2><span id="rdCount"></span></div>
+        <div id="rundown"></div>
+      </div>
+    </div>
+  </div>
+  <p class="empty" id="empty" hidden></p>
+</div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+const fmtDur = (s) => {
+  if (s == null) return '—';
+  const m = Math.floor(s / 60), r = Math.round(s % 60);
+  return `${m}:${String(r).padStart(2, '0')}`;
+};
+const ago = (iso) => {
+  if (!iso) return '—';
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (s < 90) return `${s}s ago`;
+  if (s < 5400) return `${Math.round(s / 60)}m ago`;
+  if (s < 172800) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+};
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const biasClass = (b) => b === 'long' ? 'long' : b === 'short' ? 'short' : b === 'flat' ? 'flat' : 'none';
+
+let history = null;      // { briefings: [...] }
+let current = null;      // selected briefing object
+let lang = 'en';         // 'en' | 'zh' — zh only offered when the render has a zh track
+
+const keyOf = (item) => item.file + '#' + (item.start_s || 0);
+
+function play(item) {
+  const v = $('video');
+  const seek = () => { if (item.start_s) { try { v.currentTime = item.start_s; } catch (e) {} } };
+  if (v.dataset.base === item.file) {                     // same file → just seek (chapters)
+    seek(); v.play().catch(() => {});
+  } else {
+    v.dataset.base = item.file; v.src = item.file; v.load();
+    v.addEventListener('loadedmetadata', function h() { v.removeEventListener('loadedmetadata', h); seek(); v.play().catch(() => {}); });
+  }
+  $('nowtitle').innerHTML = '';
+  $('nowtitle').append(el('b', null, item.symbol === 'FULL' ? 'Full briefing' : item.symbol), ' ', document.createTextNode(item.headline || ''));
+  document.querySelectorAll('.row').forEach((r) => r.classList.toggle('active', r.dataset.key === keyOf(item)));
+}
+
+function renderBriefing(b) {
+  current = b;
+  const zhOK = !!b.briefing_zh;
+  if (!zhOK) lang = 'en';
+  const zh = lang === 'zh';
+  const btn = $('langBtn');
+  btn.hidden = !zhOK;
+  btn.textContent = zh ? 'EN' : '中文';
+  const isStory = b.mode === 'story';
+  $('eyebrow').textContent = isStory ? "Today's Allegory" : 'Research Desk';
+  $('titleDate').textContent = '· ' + b.date;
+  // legacy ensemble renders (no label) put their story title in the big slate;
+  // labelled renders show their headline under the player instead.
+  document.querySelector('.slate__title').firstChild.textContent =
+    (isStory && b.title && !b.label) ? b.title + ' ' : 'Daily Briefing ';
+  // headline + edition under the player; cover sheet as the pre-play poster
+  const title = (zh && b.title_zh) ? b.title_zh : b.title;
+  $('vtitle').hidden = !(title && b.label);
+  $('vtitleHead').textContent = title || '';
+  $('vtitleEd').textContent = (b.label || '') + (zh ? ' · 中文' : '');
+  $('video').poster = (zh && b.cover_zh) ? b.cover_zh : (b.cover || '');
+  // meta strip
+  const meta = $('meta'); meta.textContent = '';
+  const cell = (k, v) => { const d = el('div'); d.append(el('dt', null, k), el('dd', null, v)); meta.appendChild(d); };
+  cell('Session', b.date);
+  cell('Runtime', fmtDur(b.duration_s));
+  cell('Voice', ((zh ? b.voice_zh : b.voice) || '—').replace(/^(en-US|zh-CN)-/, '').replace('Neural', ''));
+  cell('Format', isStory ? 'Animated story' : (b.director ? 'Directed' : 'Factual'));
+  cell('Rendered', ago(b.generated_at));
+  if (b.label) cell('Edition', b.label + (zh ? ' · 中文' : ''));
+
+  // rundown: full briefing first (00), then each scene / story beat
+  const rd = $('rundown'); rd.textContent = '';
+  const unit = isStory ? 'beats' : 'scenes';
+  const full = { symbol: 'FULL', file: zh ? b.briefing_zh : b.briefing, duration_s: b.duration_s,
+                 bias: null, headline: `${b.clips.length} ${unit}` };
+  const clips = b.clips.map((c) => (zh && c.file_zh) ? { ...c, file: c.file_zh } : c);
+  $('rdCount').textContent = `${b.clips.length + 1} items`;
+  [full, ...clips].forEach((item, i) => {
+    const row = el('button', 'row'); row.dataset.key = keyOf(item);
+    row.appendChild(el('span', 'row__no', String(i).padStart(2, '0')));
+    const name = el('div', 'row__name');
+    const symLine = el('div', 'row__sym', item.symbol === 'FULL' ? 'FULL BRIEFING' : item.symbol);
+    if (item.bias) { const c = el('span', 'chip chip--' + biasClass(item.bias), item.bias); c.style.marginLeft = '8px'; symLine.appendChild(c); }
+    name.appendChild(symLine);
+    name.appendChild(el('div', 'row__hl', item.headline || ''));
+    row.appendChild(name);
+    const right = el('div'); right.style.display = 'flex'; right.style.alignItems = 'center'; right.style.gap = '8px';
+    const stamp = (isStory && item.start_s != null && item.symbol !== 'FULL') ? fmtDur(item.start_s) : fmtDur(item.duration_s);
+    right.append(el('span', 'onair', 'ON AIR'), el('span', 'row__dur', stamp));
+    row.appendChild(right);
+    row.onclick = () => play(item);
+    rd.appendChild(row);
+    if (i === 0) play(item);
+  });
+}
+
+async function load() {
+  let data = null;
+  try {
+    const r = await fetch('/media/history.json?t=' + Date.now(), { credentials: 'same-origin' });
+    if (r.ok) data = await r.json();
+  } catch (e) { /* fall through */ }
+  if (!data || !data.briefings || !data.briefings.length) {
+    // fallback: single latest manifest (pre-history renders)
+    try {
+      const r = await fetch('/media/manifest.json?t=' + Date.now(), { credentials: 'same-origin' });
+      if (r.ok) { const m = await r.json(); data = { briefings: [m] }; }
+    } catch (e) { /* none */ }
+  }
+  if (!data || !data.briefings || !data.briefings.length) {
+    $('content').hidden = true; $('empty').hidden = false;
+    $('empty').textContent = 'No briefing rendered yet. Run ./briefing/run_briefing.sh after a research run.';
+    return;
+  }
+  history = data;
+  $('empty').hidden = true; $('content').hidden = false;
+
+  // Split sessions into the flagship VIDEO (Wan) vs the fast SLIDESHOW (hyperframes).
+  // Older renders predate the `renderer` field — treat those as video.
+  groups = { video: [], slideshow: [] };
+  data.briefings.forEach((b) => groups[kindOf(b)].push(b));
+
+  document.querySelectorAll('.tab').forEach((t) => {
+    const k = t.dataset.kind;
+    t.disabled = !groups[k].length;
+    t.onclick = () => showTab(k);
+  });
+  $('dateSel').onchange = () => {
+    const b = groups[activeKind][+$('dateSel').value];
+    if (b) renderBriefing(b);
+  };
+  $('langBtn').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; if (current) renderBriefing(current); };
+
+  // Open on the tab that holds the newest session.
+  const firstKind = kindOf(data.briefings[0]);
+  showTab(groups[firstKind].length ? firstKind : (groups.video.length ? 'video' : 'slideshow'));
+}
+
+const kindOf = (b) => b.kind || ((b.renderer === 'hyperframes') ? 'slideshow' : 'video');
+let groups = { video: [], slideshow: [] };
+let activeKind = 'video';
+
+function showTab(kind) {
+  if (!groups[kind] || !groups[kind].length) return;
+  activeKind = kind;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.kind === kind));
+  const sel = $('dateSel'); sel.textContent = '';
+  // one option per RENDER (a day can hold several editions — open/midday/close), so
+  // options carry the edition label and are addressed by index, not by date.
+  groups[kind].forEach((b, i) => {
+    const o = el('option', null, b.date + (b.label ? ' · ' + b.label : '') + (i === 0 ? ' · latest' : ''));
+    o.value = String(i); sel.appendChild(o);
+  });
+  renderBriefing(groups[kind][0]);
+}
+
+$('refreshBtn').onclick = load;
+load();
+</script>
+</body>
+</html>

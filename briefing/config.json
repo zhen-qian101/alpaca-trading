@@ -1,0 +1,258 @@
+{
+ "_comment": "Offline research->video render config. Swap image_model to change the image backend with no code change (the loader in story.load_pipe is model-aware: SD3 uses bf16/no-fp16-variant); production runs stabilityai/stable-diffusion-3.5-large (image_steps=28, image_guidance=4.0) through the ComfyUI backend. RENDER TIERS: the weekday post-market recap is the presenter-hosted slideshow (agent/run_research_postmarket.sh sets BRIEFING_HOST=1; see `host`), and the Sunday weekend recap is the cartoon story video whose shots MiniMax H3 renders (agent/run_research_weekend.sh, --renderer wan, story.video_engine='h3'). Both render from their own decisions/recap_*.json | weekend_*.json — recap files never touch the live trade path. Override per-run with `python -m briefing.generate --renderer {wan,hyperframes} --decisions PATH --label TEXT`.",
+ "image_model": "stabilityai/stable-diffusion-3.5-large",
+ "image_steps": 28,
+ "image_guidance": 4.0,
+ "images_enabled": true,
+ "image_backend": "comfyui",
+ "comfyui": {
+  "_comment": "image_backend='comfyui' routes ALL still-image generation (backgrounds, props, sprites, Wan first frames) to a headless ComfyUI server via briefing/comfy.py's diffusers-shaped shim, instead of an in-process diffusers pipeline. The model (SD 3.5 Large fp8 split) stays RESIDENT in VRAM across a whole render (throughput win) and the render process holds no CUDA context. Falls back to in-process diffusers automatically if the server/models aren't present. Set image_backend='diffusers' to use the old in-process path. Models live under <dir>/models/{diffusion_models,text_encoders,vae}. Server auto-starts and is left running.",
+  "dir": "/mnt/sandisk/ComfyUI",
+  "python": "~/anaconda3/envs/comfy/bin/python",
+  "host": "127.0.0.1",
+  "port": 8188,
+  "unet": "sd3.5_large_fp8_scaled.safetensors",
+  "clip_g": "clip_g.safetensors",
+  "clip_l": "clip_l.safetensors",
+  "t5": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+  "vae": "sd3.5_vae.safetensors",
+  "weight_dtype": "default",
+  "sampler": "euler",
+  "scheduler": "sgm_uniform",
+  "shift": 3.0,
+  "negative": "text, words, letters, numbers, watermark, blurry, low quality, deformed, extra limbs, ugly, photorealistic",
+  "start_timeout_s": 240,
+  "gen_timeout_s": 200,
+  "warmup_steps": 6,
+  "klein": {
+   "_comment": "FLUX.2 klein 9B distilled: the recap storyboard engine (comfy.klein_storyboard). Also holds the fixed scene style strings used to build every storyboard prompt.",
+   "unet": "flux-2-klein-9b-fp8.safetensors",
+   "clip": "qwen_3_8b_fp8mixed.safetensors",
+   "vae": "flux2-vae.safetensors",
+   "steps": 4,
+   "cfg": 1.0,
+   "sampler": "euler",
+   "gen_timeout_s": 240
+  }
+ },
+ "hf_cache": "/mnt/sandisk/hf_cache",
+ "voice": "en-US-AndrewNeural",
+ "rate": "+8%",
+ "cover": {
+  "_comment": "Per-render headline + cover sheet: gemma (director.headline) distills the session's single most important fact into an eye-catching title (+ zh title via the translator) and 2-4 bold keywords, klein draws a 16:9 crayon cover scene, and generate.make_cover_recap overlays the keywords/title as crisp typography (words are NEVER drawn by the diffusion model). When the render has a zh track, a second cover_<date>_zh.png is composed from the SAME klein art with Chinese typography (director.headline_zh localizes title+keywords; the dashboard poster follows the language toggle). Saved as cover_<date>.png beside the video and archived per edition; the dashboard shows the title under the player and uses the cover as the video poster (chosen over baking it in as a first frame: a poster shows the whole time before play, while a baked frame is gone in 2s and shifts every duration/xfade/zh-variant offset).",
+  "enabled": true,
+  "width": 1280,
+  "height": 720,
+  "recap": {
+   "_comment": "The flagship Wan recap's poster (generate.make_cover_recap): klein's art runs FULL-BLEED, a dark scrim rises through the bottom third, and the type sits in it — a letterspaced amber eyebrow naming the tier ('POST-MARKET RECAP · <date>'), a big white headline, and the keywords as pills that quote the video's own HUD palette. Its klein plate (cover_art_recap.png, its own seed) shows the whole frame, so it is prompted with the subject centred and HIGH so the bottom-third scrim covers only calm space. `framing` overrides that composition instruction.",
+   "seed": 8484
+  }
+ },
+ "zh": {
+  "_comment": "Mandarin variant of every briefing: the FINISHED English narration is translated in one batched Gemma call (director.translate_lines - translation, NOT a separate Chinese screenplay, so the zh track stays 1:1 with the video), then edge-tts re-voices it and the same visuals are re-composed with zh audio+subtitles into briefing_<date>_zh.mp4 (slides/scenes stay English; wan raws are reused, slideshow slides re-timed). Dashboard shows an EN/中文 toggle when present. A failure drops only the slide/scene that lost a line (story.ZH_MIN_KEEP=0.6 of them must survive for the variant to ship at all) — before 2026-08-06 ONE bad line out of sixteen dropped the whole 中文 track, because the cloud path returns a bare Chinese sentence instead of {\"lines\":[…]} on ~37% of calls and director._zh_salvage now accepts that.",
+  "enabled": true,
+  "voice": "zh-CN-YunyangNeural",
+  "rate": "+5%",
+  "timeout_s": 600,
+  "title_check": {
+   "_comment": "Second-model fact-check of the Chinese cover title (director.check_zh_title), added 2026-09-25. The localiser mistranslates facts nothing else catches (New Mexico -> 墨西哥州; on 2026-08-12 'chips and clouds rip' shipped as 芯片云崩). The checker reads the whole recap (notes + briefing); on an error, or a title over 30 characters, the localiser gets ONE rewrite with the critique and the version with fewer problems ships. Measured on 46 archived editions x 3 samples, two blind judges per title: titles with an agreed factual error went from 12.4% to 2.9%. enabled=false turns it off; a checker outage keeps the title unchecked, never drops it.",
+   "enabled": true,
+   "model": "glm-5.3-flash:cloud",
+   "timeout_s": 120,
+   "num_ctx": 32768,
+   "num_predict": 8000
+  }
+ },
+ "width": 1920,
+ "height": 1080,
+ "fps": 30,
+ "mode": "story",
+ "story": {
+  "_comment": "Story mode = animated cartoon briefing: one scene per symbol — the FIXED character (see briefing/characters.json and briefing/assets/characters/; the cast is fixed and committed, and an uncast ticker gets a generic mascot) performs on a cartoon set with props drawn from that stock's news/price, narrated with the real briefing facts. Top-level mode='factual' = the static per-symbol cards. Any story failure falls back to factual.",
+  "renderer": "wan",
+  "_tier_comment": "The slideshow (renderer 'hyperframes') is typographic icon-led bullet slides (catalyst cards + key-number stat grid) narrated from the Claude briefing story - NO characters/props/image-gen/Gemma, renders in minutes, zero VRAM; characters+props live in the Wan recap video only. scene_beats = default shots/scene; video_beats (wan) overrides it. include_overview adds a market OVERVIEW slide/scene. transition/transition_s = the smooth cross-dissolve stitched between scenes (and between wan shots).",
+  "scene_beats": 3,
+  "video_beats": 4,
+  "include_overview": true,
+  "transition": "fade",
+  "transition_s": 0.45,
+  "think": "high",
+  "temperature": 0.9,
+  "num_predict": 32000,
+  "beat_gap_s": 0.35,
+  "_comment_timeout_s": "Per-Gemma-call ceiling for screenplays/titles. Raised 700->1200 on 2026-07-30: the screenplay system prompt now asks for a continuous narration-linked scene (director.scene_screenplay_h3), which with think='high' takes materially longer to reason through. 700s was also close enough to the edge that a slow load — Gemma spilling to CPU because ComfyUI had not finished releasing VRAM — tipped the OVERVIEW scene into a timeout.",
+  "timeout_s": 1200,
+  "keep_alive": "0",
+  "cutout_model": "isnet-general-use",
+  "storyboard": {
+   "_comment": "enabled=true: every screenplay beat gets its own klein storyboard frame - the cast character (characters.json ref_desc + sprite as ReferenceLatent) posed IN the crayon scene doing the beat's action; replaces the SD3.5-set + sprite-composite first frame. Falls back to the old composite path if klein/server unavailable or all frames fail. Style strings are FIXED here - the director supplies content only.",
+   "enabled": true,
+   "candidates": 3,
+   "_comment_candidates": "How many alternative poses klein draws PER BEAT (same prompt and setting, different seed) before the anatomy review picks one. The review walks them in order and keeps the first clean frame, so this is best-of-N against extra limbs — a single draw produced a 3-legged anchor and a 3-handed Pip in the 07-28 recap. The QC walk is LAZY, so when candidate 0 is clean the cost is identical to candidates=1; the extra draws are also cheaper than what they replace, since a flagged frame used to force another klein<->reviewer VRAM round-trip. Set 1 to restore the old single-draw behaviour. NOTE these are alternatives to CHOOSE FROM, not extra keyframes inside one shot: Wan animates a single start_image, so a shot's smoothness is unaffected by this number.",
+   "scene_style": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty pale paper background, only sparse loose patches of color inside the lines. ",
+   "scene_tail": " Any chalkboard, chart, paper or screen in the scene shows only unlabeled colored lines, bars or simple doodles. Wide 16:9 storybook scene, flat, no shading, unpolished, warm and funny, no text, no words, no numbers, no logos",
+   "identity_lock": "The character must be an EXACT copy of the character in the reference image - same face, same hair, same clothes, same colors, identical character design, identical soft crayon rendering. Do NOT redesign them. The character has exactly two arms, two hands and two legs - no extra limbs, no floating hands. ",
+   "icon_style": "A children's crayon drawing, minimalist doodle icon: one single object, thick wobbly hand-drawn crayon outline, sparse loose patches of bright color inside the lines, flat, no shading, cute and unpolished. "
+  },
+  "review": {
+   "_comment": "Vision QC (director.anatomy_ok v3, calibrated 2026-07-25): two-stage on qwen3-vl:32b — bbox the character, crop+2x zoom, then DETECTION-style hand/foot localization; verdict from deduplicated point counts (never the model's own ok-flag). Enumerate/count prompts FAIL: VLMs snap to the 2-arm prior and report a different pair of hands each run on 3-handed frames; small dark extra hands (at the waist) are only visible after crop+zoom. Do NOT downsize the model (4b misses limbs). klein storyboards: sb_retries fresh-seed rounds; Wan shots: wan_frames sampled fracs, wan_retries rounds, then ESCALATION — a stubborn shot usually means a defective SOURCE storyboard the review missed, so the storyboard is re-rendered under QC and the shot re-tried once before giving up (named in the log). Runs batched between GPU phases (reviewer can't share VRAM with klein/Wan). enabled=false skips all QC.",
+   "enabled": true,
+   "model": "gemma4:31b-cloud",
+   "_comment_model": "CLOUD (user directive 2026-08-14) so the reviewer never competes for local VRAM. It was qwen3-vl:32b-instruct, which is 30.4 GB: on 2026-08-14 the publish-time preflight QC loaded it while ComfyUI :8189 still held 17 GB from the render, so only 37% fit on the GPU and 63% spilled to system RAM — a 171 s review became 30+ min at 979% CPU. publish_youtube runs as its OWN process after the render and, unlike every render-path caller, never calls ltx_story._free_gpu(), so nothing reclaims that VRAM. gemma4:31b-cloud is vision-capable and runs on ollama.com, so it costs no local VRAM and the contention cannot recur. Revert to qwen3-vl:32b-instruct to go back local. CAVEAT: the v4 band-tiled detector was calibrated on qwen3-vl:32b, so gemma4's limb counts are NOT yet validated against it — the contact sheet stays the real check for extra hands.",
+   "sb_retries": 2,
+   "wan_retries": 2,
+   "wan_frames": [
+    0.2,
+    0.4,
+    0.6,
+    0.8,
+    0.95
+   ],
+   "timeout_s": 180,
+   "_comment_v4": "v4 (2026-07-30) band-tiled detection: bands=[2,3] horizontal splits of the character box padded by bbox_pad, each detected separately, all points mapped back to frame coordinates and deduped ONCE at global_tol. Rationale and measurements in director._DETECT_BANDS — briefly: showing the model a whole character invites the 'humans have 2 limbs' prior and it returned exactly 2 hands/2 feet on every framing of two frames with visible defects; a band containing only feet does not. block_on limits which channel may FAIL a frame (feet only — see director._BLOCK_ON for why hands are reported but never blocking). Cost is 1 bbox + sum(bands) calls per frame; set bands=[3] to halve it.",
+   "bands": [
+    2,
+    3
+   ],
+   "block_on": [
+    "feet"
+   ]
+  },
+  "video_engine": "h3"
+ },
+ "symbols": null,
+ "max_symbols": 5,
+ "max_note_chars": 380,
+ "max_overview_chars": 850,
+ "director": {
+  "_comment": "THE DIRECTOR: screenplay/narration/zh/headline model. Default is the ollama-CLOUD deepseek-v4.1-flash (no local VRAM; device-key auth, no API key needed). The cloud path does NOT grammar-enforce format schemas and its think budgets are real tokens — both handled in director._chat_json, which validates required keys (fallback_model intentionally UNSET since 2026-08-03: raw deepseek behaviour under test — on cloud failure each call site's own deterministic fallback applies; re-add \"fallback_model\": \"gemma4:31b\" to restore the safety net). think levels: max is UNUSABLE on the screenplay prompt (measured 2026-08-03: 122k chars of reasoning, empty answer); story.think=high is the strongest level that completes. Set enabled=false for deterministic text/callouts. On any failure it silently falls back per scene.",
+  "enabled": true,
+  "model": "deepseek-v4.1-flash:cloud",
+  "think": "high",
+  "humor": "wry",
+  "temperature": 0.8,
+  "num_ctx": 8192,
+  "num_predict": 32000,
+  "max_elements": 3,
+  "target_seconds": {
+   "symbol": 26,
+   "overview": 60
+  },
+  "timeout_s": 180
+ },
+ "desk": {
+  "_comment": "THE DESK SLIDE (intraday bullets slideshows only): a screenshot of the LIVE dashboard, held wide and then pushed panel by panel, narrated from the account's own numbers — equity, the open position, the fills and risk blocks since the last edition, and today's rotation board. Captured by briefing/desk_probe.py, which runs in the TRADING .venv (playwright + the dashboard's read-only builders live there) and freezes the page before shooting, so the figures the narrator speaks are the pixels in the picture. Gemma writes the script behind a NUMERIC GUARD (director.desk_narration): any digit not on the fact sheet throws the take away, and after 3 tries the deterministic fact-sheet script ships instead. Every failure mode degrades — dashboard down = same facts on the typographic slide, capture broken = no desk slide and the deck renders as before. NOTE the slideshows are public on YouTube, so this puts real equity and holdings on the internet; set enabled=false to stop that. 'after' names the slide the desk follows (OVERVIEW = second slide, \"\" = first).",
+  "enabled": true,
+  "url": "http://127.0.0.1:8787",
+  "after": "OVERVIEW",
+  "lines": 4,
+  "timeout_s": 240,
+  "min_zoom": 1.2,
+  "max_zoom": 2.6,
+  "shot_width": 1920,
+  "shot_height": 1080
+ },
+ "subtitles": true,
+ "subtitle_fontsize": 11,
+ "subtitle_margin_v": 14,
+ "callouts": true,
+ "callout_count": 2,
+ "callout_px": 512,
+ "hyperframes_version": "0.7.65",
+ "out_dir": "web/static/media",
+ "archive_dir": "/mnt/sandisk/alpaca/briefings",
+ "youtube": {
+  "_comment": "briefing/publish_youtube.py — uploads an archived edition via YouTube Data API v3. Every scheduled render publishes automatically — the weekday post-market recap and the weekend recap (run_research_postmarket.sh / run_research_weekend.sh) both set BRIEFING_PUBLISH=1; set it to 0 to render without uploading. English audio only — the zh cut is rendered and archived but not uploaded. AI DISCLOSURE is always on: every upload sets status.containsSyntheticMedia=true (TTS narration + generated visuals) and stamps a matching line into the description; there is no switch to disable it. client_secret/token live under briefing/.youtube/ (gitignored — the token is full channel access, treat as a password). category_id 25=News & Politics, 27=Education, 28=Science & Tech; confirm against videoCategories.list for your region. title_format prefixes the edition label ('Post-market recap | <headline>'); the headline is clipped to fit 100 chars, never the label. Verified 2026-07-27 that this project is NOT audit-locked, so 'public' works — privacy starts at 'unlisted' so nothing goes out publicly until you choose it; flip to 'public' when happy, or override per run with --privacy/--publish-at.",
+  "client_secret": "briefing/.youtube/client_secret.json",
+  "token": "briefing/.youtube/token.json",
+  "category_id": "25",
+  "title_format": "{label} | {title}",
+  "privacy": "public",
+  "made_for_kids": false,
+  "base_tags": [
+   "stocks",
+   "stock market",
+   "finance",
+   "investing",
+   "market news",
+   "trading"
+  ],
+  "preflight_qc": {
+   "_comment": "Anatomy frame review on the ASSEMBLED video immediately BEFORE upload (publish_youtube.preflight_qc), separate from the render's own QC — the render's gates protect a re-runnable render, this one protects the irreversible publish. RECAP ONLY (a bullets slideshow is typographic and has no cast). IMPORTANT, measured 2026-07-30: the automated half is PARTIAL. Banded counting (director v4) reliably catches extra LEGS/FEET — it blocks the three-legged Anchor that v3 passed — but the HAND channel is inverted (misses a real third hand, fires on a clean frame), so director._BLOCK_ON blocks on feet only. Extra HANDS are therefore NOT machine-detectable: the contact sheet written to sheet_dir (default briefing/.hf_work/qc_review/<video>_qc.png) is the only check for them, which is why its path is logged even when the run passes. block=true refuses the upload on a feet failure (re-render the edition); --skip-qc overrides. A reviewer that cannot decide counts as a pass, so a busy ollama never blocks.",
+   "enabled": true,
+   "block": true,
+   "frames": 24,
+   "contact_sheet": true,
+   "sheet_cols": 4,
+   "sheet_tile_w": 480
+  },
+  "_comment_hashtags": "Hashtags appended to the DESCRIPTION — a separate surface from base_tags, which is the invisible keyword field. The edition's own tickers are appended after these automatically, and the combined list is capped at 12 (publish_youtube._HASHTAG_MAX): YouTube ignores EVERY hashtag on a video carrying more than 15, so the cap stops a long watchlist from silently voiding the lot. Order matters — YouTube renders the FIRST THREE above the video title, so put the three you most want a viewer to see first. Spaces and punctuation are stripped ('stock market' -> #stockmarket) because a hashtag ends at the first space. Set to [] to publish no hashtags.",
+  "hashtags": [
+   "stocks",
+   "stockmarket",
+   "investing",
+   "trading",
+   "marketnews",
+   "wallstreet"
+  ],
+  "_comment_hashtags_by_kind": "Per-render-kind override of `hashtags`, keyed by meta.kind ('slideshow' = a bullets slideshow edition, 'video' = the post-market/weekend recap). A recap and a midday slideshow are different formats and are searched for in different words, so the recap leads with the recap/close/earnings vocabulary; the generic channel set above still applies to anything without an entry here. Same rules as `hashtags`: the FIRST THREE are the ones YouTube renders above the title, and the edition's tickers are appended after these before the 12-tag cap.",
+  "hashtags_by_kind": {
+   "video": [
+    "marketrecap",
+    "stockmarket",
+    "closingbell",
+    "earnings",
+    "stocks",
+    "investing",
+    "wallstreet"
+   ]
+  }
+ },
+ "h3": {
+  "_comment": "MiniMax H3 ref2va video engine for the flagship recap (story.video_engine='h3', the only engine since Wan2.2 was retired as a renderer). Runs the ISOLATED ComfyUI v0.30 worktree on :8189 with sage attention (production :8188 is v0.28, no H3 nodes; the two must never hold VRAM together — briefing/h3.py and story._run_h3_batch manage the choreography). One generation covers 1-2 beats with a REAL internal cut placed at the narration line boundary, conditioned on the cast sprite (<Picture 1>, identity) + each beat's klein storyboard (composition), rendered NATIVELY at the 1280x704 HUD canvas since 2026-08-06 — it used to render 960x544 and lanczos-upscale, which was measured as the recap's main quality gap (lanczos cannot add detail, only soften; native scores 8% higher laplacian variance and is visibly crisper in the crayon texture). Native costs 1.81x the sampling time (8.27 -> 14.94 s/it at 20 steps), but SageAttention 2.2 + EasyCache bought 2.03x, so a clip at full canvas is still ~12% FASTER than the old 960x544 pipeline was. Revert by setting width/height back to 960/544 — split_beats re-enables the lanczos step on its own. ref_image_size='max' = stronger identity, several times slower. All measured 2026-08-04; test clips in /mnt/sandisk/alpaca/briefings/_h3_tests.",
+  "dir": "/mnt/sandisk/ComfyUI-h3",
+  "python": "/mnt/sandisk/ComfyUI-h3/.venv/bin/python",
+  "port": 8189,
+  "width": 1344,
+  "height": 768,
+  "steps": 12,
+  "sampler": "res_multistep",
+  "scheduler": "simple",
+  "retries": 1,
+  "gen_timeout_s": 2400,
+  "variant": "fl2va",
+  "_easycache_comment": "ComfyUI's OWN EasyCache node (comfy_extras/nodes_easycache.py, v0.30) spliced between UNETLoader and the sampler — NOT a third-party patch, nothing to install. It skips a denoise step whenever the model's rate of change is small. MEASURED 2026-08-06 on a 243-frame 960x544 20-step clip at a fixed seed: sampling 337s -> 185s (16.91 -> 9.29 s/it), EasyCache itself reporting 'skipped 9/20 steps (1.82x speedup)'. Quality held — same shot, character, style and action beats, no face/hand artifacts; the SSIM 0.822 vs baseline is trajectory divergence, not degradation, since a cached run is a different valid sample. SUPERSEDED 2026-08-06 — EasyCache is now OFF and steps cut 20 -> 12 instead, because fewer steps beat step-caching at EVERY time budget (6-frame mean laplacian variance, 1280x704, same seed): at 350s/clip 10-steps-no-cache scores 631 vs cache-0.20's 396 (+59%); at 410s/clip 12-steps-no-cache scores 672 vs cache-0.10's 439 (+53%). Against the previous live setting (20 steps + cache 0.05) the new one is 18% FASTER and 17% SHARPER. Both save compute, but they degrade differently: a step-cache reuses a stale residual and smears high frequencies (the 'vague' look), while fewer steps just stops denoising earlier, which this flat crayon art tolerates well — no undercooking visible even at 10 steps. Re-enable the cache only if a future model is less forgiving. Earlier cache curve, kept for reference: MEASURED 2026-08-06 at 1280x704 after the user reported the recap looked vague — step-skipping SOFTENS the image and that, not resolution, was the main cause. Sharpness (laplacian variance, same seed/prompt) vs cache OFF: thr0.05 -11.6% (1.42x faster), thr0.10 -34.1% (1.73x), thr0.20 -27.9% (2.03x). thr0.20 was the original default and cost far too much for a flagship video, so the default is now 0.05. NOTE the 0.10/0.20 inversion: single-frame sharpness is noisy because each trajectory renders different detail, so treat the ordering between neighbouring thresholds as indicative, not exact. Set enabled=false for maximum sharpness at 2.03x the render time.",
+  "easycache": {
+   "enabled": false,
+   "reuse_threshold": 0.05,
+   "start_percent": 0.15,
+   "end_percent": 0.95,
+   "verbose": true
+  },
+  "_resolution_comment": "1344x768 is H3's OWN maximum: the node defines MAX_PIXELS = 768*1344 with BASE_SHORT_EDGE 768. The previous 1280x704 sat at 0.90 MP with a 704 short edge, i.e. BELOW the trained short edge. This is +15% pixels and puts the short edge where the model expects it. Going further (1920x1080 = 2.07 MP) is double the model's budget and out of distribution; 2K needs the separate H3-Regenerate-2K model, which is not installed."
+ },
+ "host": {
+  "_comment": "The host-PiP daily briefing (the ONE video per trading day since 2026-08-10). enabled=false here because production opts in via BRIEFING_HOST=1 in run_research_postmarket.sh; per_slide_secs is the narration budget per slide (overview, DESK and each symbol); zh=true renders the full 中文 variant alongside EN. stylist=true lets the presenter's stylist redesign the outfit daily from the real NYC weather (BRIEFING_STYLIST=0 or false here to disable; any failure falls back to the presenter's locked keyframe).",
+  "enabled": false,
+  "per_slide_secs": 30,
+  "zh": true,
+  "stylist": true,
+  "host_json": "host2.json",
+  "_host_json_comment": "Which presenter production renders — a presenter JSON under briefing/ (local-only, gitignored). 陈谷雨 (host2.json) since 2026-08-12. Required: generate.py, run_stylist.sh, web/server.py and voice.py resolve the presenter from this key and fail loudly when it is unset. BRIEFING_HOST_JSON overrides it for one run."
+ },
+ "host_pip": {
+  "_comment": "canvas = the compositing/ship resolution. 2560x1408 since 2026-08-13 (was 1920x1056): each raw LTX clip (still generated at 1280x704) is upscaled x2 to this before compositing, and the slide is now RASTERISED at 2560x1440 and cropped to match, so typography is native rather than stretched. The upscale is NVIDIA Video Super Resolution via nvvfx (vsr_quality), ~1.0 ms/frame, one pass straight to canvas. Remove `canvas` entirely to ship the raw 1280x704 again. layout=strip restores the legacy shrunken-left-panel look; scrim_peak overrides the faint canvas wash (90) / heavy strip scrim (215).",
+  "canvas": [
+   2560,
+   1408
+  ],
+  "vsr_quality": "ULTRA"
+ },
+ "audio_loudness": {
+  "_comment": "EBU R128 normalisation applied ONCE at final assembly (never per clip, so re-concatenating cannot compound it). Measured before this: the shipped recap sat at -19.1 LUFS with -2.6 dBFS true peak. -16 is podcast norm and leaves headroom; -14 is streaming norm but needs real limiting against that peak. Set enabled=false to ship the raw levels.",
+  "enabled": true,
+  "i": -16.0,
+  "tp": -1.5,
+  "lra": 11.0
+ }
+}

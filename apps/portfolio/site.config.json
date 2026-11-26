@@ -1,0 +1,12 @@
+{
+  "title": "Alpaca Trading System",
+  "description": "A self-hosted algorithmic trading system running on a paper (simulated) account: its equity curve, trades, strategy rules and how it is built.",
+  "siteUrl": "",
+  "repoUrl": "https://github.com/zhen-qian101/alpaca-trading",
+  "author": {
+    "name": "",
+    "links": [
+      { "label": "", "url": "" }
+    ]
+  }
+}

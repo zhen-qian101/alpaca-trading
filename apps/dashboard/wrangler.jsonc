@@ -1,0 +1,52 @@
+/**
+ * Alpaca dashboard: one Worker that serves the SPA from Static Assets and
+ * answers /api/* and /media/* itself, reading everything from R2.
+ *
+ * Data flow is PUSH ONLY: the home box (web/publisher.py) uploads to the R2
+ * bucket over the S3 API. This Worker never calls the home box, and broker
+ * keys never leave it.
+ *
+ * Reference: https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "alpaca-dashboard",
+	"main": "worker/index.ts",
+	"compatibility_date": "2026-11-23",
+
+	// Served on *.workers.dev, behind Cloudflare Access (configured on the
+	// account, not here). Preview URLs are a second public hostname per version
+	// that Access would also have to cover, so they stay off.
+	"workers_dev": true,
+	"preview_urls": false,
+
+	"assets": {
+		// Unknown paths fall back to index.html so client-side routes deep-link.
+		"not_found_handling": "single-page-application",
+		// These paths reach the Worker even when a static file of the same name
+		// exists: the API and the R2-backed media are never served as assets.
+		"run_worker_first": ["/api/*", "/media/*"]
+	},
+
+	"r2_buckets": [
+		{
+			"binding": "DATA",
+			"bucket_name": "alpaca-dashboard"
+		}
+	],
+
+	// NO "vars". The Access settings are Worker SECRETS, set once on the
+	// deployed Worker (`wrangler secret put` or the dashboard), never committed:
+	//   ACCESS_TEAM_DOMAIN  https://<team>.cloudflareaccess.com
+	//   ACCESS_AUD          the Access application's Audience (AUD) tag
+	// Secrets survive every deploy; a plain var declared here would be reset by
+	// each CI deploy. While either is unset the Worker REFUSES every /api and
+	// /media request (fail closed). They are typed in worker/env.d.ts.
+	// DEV_AUTH_BYPASS is deliberately NOT declared here either. It may only
+	// come from apps/dashboard/.dev.vars (gitignored) for local development.
+
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+}

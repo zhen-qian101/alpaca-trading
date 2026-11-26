@@ -1,0 +1,35 @@
+# Response headers for the public portfolio (Workers Static Assets reads this
+# file from the build output; Vite copies public/ into dist/). Not applied by
+# `vite dev`; `pnpm dev:assets` (wrangler dev over dist/) does apply it.
+#
+# CSP notes:
+# - script-src 'self': no inline script anywhere (theme-init.js is a file).
+# - style-src has ONE hash and no 'unsafe-inline'. It is the <style> element
+#   lightweight-charts injects for its TradingView attribution logo, which
+#   stays on. scripts/config.test.ts recomputes it from the installed library,
+#   so an upgrade that changes that style fails the tests instead of silently
+#   unstyling the logo.
+# - frame-src: the YouTube no-cookie player only, created after a click.
+# - connect-src 'self': the page fetches /data/portfolio.json and nothing else.
+# - Referrer-Policy strict-origin-when-cross-origin: YouTube's embedded player
+#   refuses to play without a referrer; this sends the origin only, never a
+#   path.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'sha256-3pRED1tOXas1FXFoPb9TGCjmYe9XQsmO9OV23khV2nY='; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src https://www.youtube-nocookie.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), midi=(), browsing-topics=()
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=2592000
+
+/data/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Robots-Tag: noindex

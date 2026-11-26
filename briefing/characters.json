@@ -1,0 +1,110 @@
+{
+  "GOOG": {
+    "name": "Gigi",
+    "kind": "girl",
+    "personality": "Playful and cheeky but quietly brilliant - endlessly curious, delighting in discovering things and sharing them with everyone, never stuffy.",
+    "colour": "google blue/red/yellow/green",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A cheerful teenage girl, about 15, playful and cheeky but quietly brilliant - Google's spirit of 'you can be serious without a suit': endlessly curious, delighting in discovering things and sharing them, never stuffy. Bright wide eyes behind big round glasses sitting slightly askew, a mischievous grin, leaning back mid-laugh as she launches a little paper airplane into the air. Her outfit uses ONLY the four Google logo colors, worn casually: an unbuttoned cobalt blue blazer with rolled-up sleeves over a plain white tee (#4285F4), a loosely tied red hair ribbon (#EA4335), a small yellow satchel slung carelessly across her back (#FBBC05), scuffed green sneakers (#34A853); simple dark hair. Full body, centered, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words",
+    "description": "A teenage girl launching a paper airplane - knowledge flying out into the world. Crayon-drawn, minimalist, palette locked to the four Google logo colors.",
+    "ref_desc": "a teenage girl with a shoulder-length dark bob and round black glasses, a plain white short-sleeve tee, a small yellow satchel on a shoulder strap, a sage-green pleated skirt, green-and-white sneakers, white socks"
+  },
+  "NVDA": {
+    "name": "Dash",
+    "kind": "boy",
+    "personality": "accelerated computing - make everything impossibly fast",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A playful boy, about 14, gliding on a skateboard with one foot pushing off, hair blown back, happy grin, a bright green hoodie (#76B900), black pants and black sneakers, a few light green speed lines trailing behind. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A boy gliding on a skateboard with green speed lines, bright green hoodie. Crayon picture-book style.",
+    "ref_desc": "a teenage boy with messy brown windblown hair, a bright green hoodie, black pants and black high-top sneakers, riding a black skateboard"
+  },
+  "MSFT": {
+    "name": "Windy",
+    "kind": "boy",
+    "personality": "empower every person to achieve more - the dependable builder",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A friendly helpful boy, about 14, with square glasses, kneeling as he places the last of four toy blocks into a neat two-by-two square: one red (#F25022), one green (#7FBA00), one blue (#00A4EF), one yellow (#FFB900). Cobalt blue sweater, grey trousers. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A helpful boy with square glasses stacking four window-color blocks. Crayon picture-book style.",
+    "ref_desc": "a boy with fluffy brown hair and big round black glasses, a cobalt blue crew sweater over a white collared shirt, grey trousers, brown leather shoes"
+  },
+  "AMZN": {
+    "name": "Zippy",
+    "kind": "girl",
+    "personality": "customer obsession - deliver anything, with a smile",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A hustling cheerful teenage girl, about 14, who treats every errand like a game - freckles, high ponytail, tongue peeking out in happy concentration as she balances a wobbling tower of plain brown cardboard boxes taller than herself, one leg lifted for balance. Her outfit uses the Amazon colors: a bright orange zip vest (#FF9900) over a midnight navy tee and navy joggers (#232F3E), orange sneakers, a curved orange arrow patch like a smile on the vest. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A girl in an orange vest standing beside a stack of brown delivery boxes. Soft crayon picture-book style.",
+    "ref_desc": "a girl with a high brown ponytail, an orange puffer vest over a navy long-sleeve top, navy joggers, orange sneakers"
+  },
+  "TSLA": {
+    "name": "Bolt",
+    "kind": "girl",
+    "personality": "accelerate the world into sustainable energy - fearless and theatrical",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A daring girl, about 15, pulling a little wheelie on a kick scooter, windswept hair with a lightning-bolt hairpin, laughing, a red racer jacket (#E82127) over a white tee, white jeans, red sneakers. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A daring girl mid-wheelie on a kick scooter, red racer jacket. Crayon picture-book style.",
+    "ref_desc": "a girl with wild windswept brown hair, a red racer jacket over a white tee, light grey jeans rolled at the ankle, red sneakers, on a teal kick scooter"
+  },
+  "AAPL": {
+    "name": "Pip",
+    "kind": "girl",
+    "personality": "think different - simplicity as the ultimate sophistication",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A serene, quietly confident teenage girl, about 15, an effortless minimalist who says little and notices everything - sleek bob haircut, tiny knowing smile, eyes closed in contentment as she takes one perfect bite of an apple she holds with both hands. Her outfit is almost entirely greyscale: a light heather-grey turtleneck, charcoal trousers, white minimal sneakers - with one tiny six-color rainbow stripe woven into her hair band. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A serene greyscale girl with a rainbow hairband taking one perfect bite of an apple. Crayon minimalist.",
+    "ref_desc": "a serene girl with a black bob haircut and a thin rainbow hairband, a light grey turtleneck, charcoal trousers, white sneakers, holding a red apple"
+  },
+  "META": {
+    "name": "Loop",
+    "kind": "girl",
+    "personality": "connection - bring everyone into the room",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A warm sociable girl, about 14, waving with both arms flung wide in welcome, curly hair with chunky VR goggles pushed up in it, a vivid azure hoodie (#0081FB), sky-blue skirt, blue-and-white sneakers. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A sociable girl waving with both arms, VR goggles in her curly hair, azure hoodie. Crayon picture-book style.",
+    "ref_desc": "a small girl with big curly brown hair wearing blue VR goggles over her eyes, a bright blue hoodie with white drawstrings, a blue pleated skirt, blue sneakers with white socks"
+  },
+  "ORCL": {
+    "name": "Ora",
+    "kind": "girl",
+    "personality": "the unflappable keeper of everyone's data - never loses a thing",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A composed, tidy teenage girl, about 15, the unflappable organizer who never loses anything and secretly loves it - neat braid, one eyebrow raised with a satisfied smirk, sliding the last little red drawer perfectly into a tall cabinet of identical red drawers while balancing three more little drawers on her head. Her outfit uses ONLY the Oracle colors: a signal-red cardigan (#F80000) over a white blouse, charcoal pleated skirt, black mary-jane shoes. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A tidy girl balancing red storage drawers beside a tall red drawer cabinet. Soft crayon picture-book style.",
+    "ref_desc": "a girl with dark hair in a long braid, a red cardigan over a white collared blouse, a dark grey pleated skirt, white knee socks, dark mary-jane shoes"
+  },
+  "SOXL": {
+    "name": "Trip",
+    "kind": "boy",
+    "personality": "triple-leveraged semiconductors - three of everything, always",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A hyperactive small teenage boy, about 13, who does everything in threes and cannot explain why - buzzing with triple-espresso energy, juggling three golden computer chips while riding a pogo stick, three tufts of hair sticking up. His outfit: an emerald green tracksuit (#00A651) with three gold stripes down the sleeves, gold sneakers. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A hyper kid juggling three gold chips while riding a pogo stick. Crayon minimalist.",
+    "ref_desc": "a boy with short brown hair, an emerald green hoodie and green joggers with gold stripes, sparkly gold sneakers"
+  },
+  "TQQQ": {
+    "name": "Quinn",
+    "kind": "kid",
+    "personality": "triple-leveraged optimism - everything is UP (until it isn't)",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A gleeful kid, about 14, bouncing high on a pogo stick with arms up and hair standing straight up, a navy tracksuit (#1B2C5C) with small light-blue chevrons pointing upward (#6EA8DC), white sneakers. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A gleeful kid bouncing high on a pogo stick, navy tracksuit with upward chevrons. Crayon picture-book style.",
+    "ref_desc": "a little boy with short brown hair in a navy tracksuit with a white zipper and a small light-blue diamond on the chest, white sneakers"
+  },
+  "BTC/USD": {
+    "name": "Sato",
+    "kind": "girl",
+    "personality": "decentralization - goes her own way, carries her own treasure",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon and colored-pencil strokes, loose sketchy hand-drawn lines, wobbly and imperfect, cute rounded picture-book proportions, mostly empty white space, only sparse loose patches of color inside the lines. A free-spirited girl, about 15, grinning as she spins a big gold coin on one fingertip, windblown hair under a bright orange beanie (#F7931A), an orange puffer vest over a white long-sleeve tee, brown shorts and boots. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A free-spirited girl spinning a gold coin on her fingertip, orange beanie and vest. Crayon picture-book style.",
+    "ref_desc": "a little girl in a chunky orange pompom beanie, long brown hair, an open orange puffer jacket over a cream sweater, brown shorts, tall brown lace-up boots"
+  },
+  "OVERVIEW": {
+    "name": "The Anchor",
+    "kind": "anchor",
+    "personality": "the warm storyteller who makes sense of the whole day",
+    "colour": "",
+    "visual_prompt": "A children's crayon drawing, minimalist cartoon-manga illustration: rough waxy crayon outlines, loose sketchy hand-drawn strokes, wobbly imperfect lines, mostly empty white space, only sparse loose patches of color inside the lines. A poised but warm teenage news anchor, about 16, the calm friendly storyteller of the group - neat side-parted hair, a reassuring smile, sitting slightly sideways on a tall stool holding a paper megaphone in one hand and a steaming mug in the other. Outfit in newsroom neutrals with one warm accent: a navy blazer over a white shirt, amber-gold tie (#F2A93B), dark trousers, amber socks peeking out. Full body, centered, isolated on plain solid white background, thick imperfect crayon linework, flat, no shading, unpolished, warm and funny, no text, no words, no logos",
+    "description": "A warm teen news anchor on a stool with a paper megaphone and a steaming mug. Crayon minimalist.",
+    "ref_desc": "a teenage news anchor boy with neat side-swept brown hair, a navy blazer over a white shirt with an amber-gold tie, charcoal trousers, amber socks and mustard loafers"
+  }
+}

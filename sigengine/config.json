@@ -1,0 +1,283 @@
+{
+  "_comment": "Signal-engine config. One entry per watched symbol. The engine pulls bars (IBKR primary with yfinance fallback \u2014 see the `data` block; crypto uses crypto_source, which as of 2026-07-03 can be 'ibkr' to try IBKR's Crypto/PAXOS contract first, falling back to yfinance automatically on any failure \u2014 same primary/fallback pattern as equities, just a separate knob since crypto needs its own IBKR market-data entitlement), upserts them into the SQLite bar cache (relay.bars_db, UTC-normalized), runs the per-symbol `strategies` list (see _comment_strategies below; sigengine/engine.py -> backtest.multi_strategy.run_symbol_strategies) over the cached warm-up window, and diffs the resulting order events against the last processed bar. New events are translated to OrderRequests and sent through relay.order_manager.handle() IN-PROCESS (risk gate + signal-driven rotation + journal) \u2014 no TradingView, no HTTP layer. ALL symbols moved from 5-min to 1-HOUR bars 2026-07-03 (decided by a since-retired 5-min vs 1h comparison study). poll_seconds is a smaller FRACTION of one bar period than the old 60s-on-5min setup (300/3600=8.3% vs 60/300=20%). enabled=false means the engine skips the symbol entirely (it will not even poll bars); bias/flat in decisions.json is a SEPARATE layer enforced by the relay's risk gate. NOTE: the flat `fast`/`slow`/`window` keys on each symbol below are NO LONGER the live trading logic as of 2026-07-04 (see _comment_strategies) \u2014 they're kept only because backtest/chart_view.py reads them to draw the reference EMA overlay on the dashboard's signal chart; do not assume they describe what the engine is actually trading.",
+  "_comment_strategies": "Per-symbol multi-strategy rotation (sigengine/engine.py -> backtest.multi_strategy.run_symbol_strategies): a `strategies` LIST runs more than one independent signal source over the same bars; whichever strategy's entry fires FIRST wins the symbol's rotation slot, and an exit from EITHER strategy's own rules closes the real position (OR-exit). DEFAULT AS OF 2026-07-04: every enabled symbol below runs MACD+SMA-200 (backtest/macd_sma.py) + Bollinger+RSI (backtest/bollinger_rsi.py) as its two rotation candidates \u2014 chosen after backtesting the REAL merged combo (not just each strategy's own standalone numbers) across all 10 symbols: mean return 152.5% vs. plain-EMA's 75.3% and buy-and-hold's 168.7%, Sharpe 2.92 vs. EMA's 1.88, at ~25 trades/symbol (much less real-world fee/slippage exposure than the ~68 trades/symbol EMA+BB-RSI needed for a similar edge). Per-symbol fast_len/slow_len/veryslow_len (MACD) and rsi_length/bb_length/bb_mult (BB-RSI) below are each symbol's own best-by-Sharpe grid-search fit \u2014 an in-sample upper bound, not yet out-of-sample/walk-forward validated. The prior EMA-only default and the EMA+Donchian dormant combo (which empirically UNDERPERFORMED plain EMA once actually merged \u2014 Donchian's exit rule was cutting EMA's trades short) are both retired from live use; the EMA code remains available via backtest/multi_strategy.py's STRATEGY_RUNNERS for future comparison (the Donchian module has since been removed).",
+  "poll_seconds": 300,
+  "warmup_bars": 5,
+  "data": {
+    "primary": "ibkr",
+    "fallback": "yfinance",
+    "ibkr_host": "127.0.0.1",
+    "ibkr_port": 4002,
+    "ibkr_client_id": 2,
+    "crypto_source": "ibkr"
+  },
+  "symbols": {
+    "AMZN": {
+      "fast": 20,
+      "slow": 75,
+      "window": 300,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 16,
+          "slow_len": 26,
+          "signal_len": 9,
+          "veryslow_len": 150
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 200,
+          "bb_mult": 1.5
+        }
+      ]
+    },
+    "GOOG": {
+      "fast": 9,
+      "slow": 65,
+      "window": 300,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 16,
+          "slow_len": 21,
+          "signal_len": 9,
+          "veryslow_len": 100
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 14,
+          "bb_length": 50,
+          "bb_mult": 1.5
+        }
+      ]
+    },
+    "NVDA": {
+      "fast": 9,
+      "slow": 50,
+      "window": 300,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 12,
+          "slow_len": 35,
+          "signal_len": 9,
+          "veryslow_len": 150
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 20,
+          "bb_mult": 1.5
+        }
+      ]
+    },
+    "MSFT": {
+      "fast": 29,
+      "slow": 65,
+      "window": 50,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 8,
+          "slow_len": 21,
+          "signal_len": 9,
+          "veryslow_len": 200
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 50,
+          "bb_mult": 1.5
+        }
+      ]
+    },
+    "TSLA": {
+      "fast": 9,
+      "slow": 75,
+      "window": 300,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 12,
+          "slow_len": 26,
+          "signal_len": 9,
+          "veryslow_len": 200
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 100,
+          "bb_mult": 2.0
+        }
+      ]
+    },
+    "AAPL": {
+      "fast": 9,
+      "slow": 50,
+      "window": 100,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 8,
+          "slow_len": 35,
+          "signal_len": 9,
+          "veryslow_len": 100
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 100,
+          "bb_mult": 2.0
+        }
+      ]
+    },
+    "META": {
+      "fast": 9,
+      "slow": 75,
+      "window": 300,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 12,
+          "slow_len": 35,
+          "signal_len": 9,
+          "veryslow_len": 200
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 200,
+          "bb_mult": 2.5
+        }
+      ]
+    },
+    "SOXL": {
+      "fast": 9,
+      "slow": 50,
+      "window": 100,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.03,
+      "enabled": false,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 16,
+          "slow_len": 21,
+          "signal_len": 9,
+          "veryslow_len": 150
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 100,
+          "bb_mult": 2.0
+        }
+      ],
+      "_stop_note": "0.06 -> 0.03 on 2026-08-28. TWO reasons, and the first alone settles it. STRUCTURAL: this book is all-in/all-out at deploy 0.97, so a 6% position stop is 5.82% of ACCOUNT equity \u2014 larger than the 5% daily_loss_limit it sits under. One ordinary stop-out on this symbol therefore tripped the account circuit breaker and halted every new buy for the rest of the day. A per-trade control must fire well inside the account-level one; 3% is 2.91% of equity, so it takes two. MEASURED: swept over the engine's own 1h cache with run_combo_backtest at 5bps/side, 6% was the worst of {2,3,4,6}% for both symbols in the full window AND in the recent half the entry params were not fitted on (SOXL Sharpe 0.60 vs 1.29 at 3%; TQQQ 1.95 vs 2.21). TQQQ prefers 3% in both halves; SOXL is a coin flip between 2% and 3%, so the leveraged pair is kept together. The eight other symbols stay at 2% \u2014 nothing in the sweep argues for moving them.",
+      "_retired_note": "RETIRED FROM THE SHARE STRATEGY 2026-08-28. SOXL is the put sleeve's underlying (decisions/csp.json), and the sleeve's assigned shares live in this same account. With SOXL still enabled here, this strategy's exit signal would have sold the sleeve's shares (fire_event's close branch closes whatever is held) and its entry would have bought on top of a short put. Retiring it is the clean separation. Cost, measured on the 2023-09..2026-08 cache at the 3% stop: SOXL was the share book's second-best in-sample name (Sharpe 1.28, +394%). Set enabled back to true only if the sleeve is switched off."
+    },
+    "TQQQ": {
+      "fast": 29,
+      "slow": 75,
+      "window": 50,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.03,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 12,
+          "slow_len": 21,
+          "signal_len": 9,
+          "veryslow_len": 150
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 100,
+          "bb_mult": 2.0
+        }
+      ],
+      "_stop_note": "0.06 -> 0.03 on 2026-08-28. TWO reasons, and the first alone settles it. STRUCTURAL: this book is all-in/all-out at deploy 0.97, so a 6% position stop is 5.82% of ACCOUNT equity \u2014 larger than the 5% daily_loss_limit it sits under. One ordinary stop-out on this symbol therefore tripped the account circuit breaker and halted every new buy for the rest of the day. A per-trade control must fire well inside the account-level one; 3% is 2.91% of equity, so it takes two. MEASURED: swept over the engine's own 1h cache with run_combo_backtest at 5bps/side, 6% was the worst of {2,3,4,6}% for both symbols in the full window AND in the recent half the entry params were not fitted on (SOXL Sharpe 0.60 vs 1.29 at 3%; TQQQ 1.95 vs 2.21). TQQQ prefers 3% in both halves; SOXL is a coin flip between 2% and 3%, so the leveraged pair is kept together. The eight other symbols stay at 2% \u2014 nothing in the sweep argues for moving them."
+    },
+    "ORCL": {
+      "fast": 9,
+      "slow": 50,
+      "window": 100,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 9,
+          "slow_len": 21,
+          "signal_len": 9,
+          "veryslow_len": 100
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 50,
+          "bb_mult": 2.0
+        }
+      ]
+    },
+    "BTC/USD": {
+      "fast": 20,
+      "slow": 50,
+      "window": 100,
+      "interval": "1h",
+      "deploy": 0.97,
+      "stop": 0.02,
+      "enabled": true,
+      "strategies": [
+        {
+          "type": "macd_sma",
+          "fast_len": 16,
+          "slow_len": 26,
+          "signal_len": 9,
+          "veryslow_len": 200
+        },
+        {
+          "type": "bollinger_rsi",
+          "rsi_length": 6,
+          "bb_length": 50,
+          "bb_mult": 2.5
+        }
+      ]
+    }
+  }
+}

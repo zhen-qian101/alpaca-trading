@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Look review — Alpaca Terminal</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/look.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>👔</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand__mark">ALPACA</span>
+    <span class="brand__sub">look review</span>
+  </div>
+  <div class="topbar__status">
+    <span id="verdictBadge" class="badge badge--muted">…</span>
+    <span id="hostBadge" class="badge badge--muted">host —</span>
+  </div>
+  <div class="topbar__right">
+    <select id="dateSel" class="btn" title="Which session's look"></select>
+    <a class="btn" href="/" title="Back to the terminal">terminal</a>
+    <a class="btn" href="/briefing.html" title="Daily research briefing video">briefing</a>
+  </div>
+</header>
+
+<main class="lookmain">
+
+  <!-- The single sentence that matters: what goes on screen tonight. -->
+  <section class="verdict" id="verdict">
+    <div class="verdict__text" id="verdictText">loading…</div>
+    <div class="verdict__actions">
+      <button id="approveBtn" class="btn btn--primary" hidden>sign off</button>
+      <button id="revokeBtn" class="btn" hidden>withdraw sign-off</button>
+    </div>
+  </section>
+
+  <div class="lookgrid">
+
+    <!-- ---------- the keyframe, which is the thing being judged ---------- -->
+    <section class="card card--wide" aria-labelledby="h-kf">
+      <div class="card__head">
+        <h2 id="h-kf">Stage keyframe</h2>
+        <span class="card__note mono" id="kfNote"></span>
+      </div>
+      <div class="card__body card__body--flush">
+        <div class="shot">
+          <img id="kfImg" alt="the day's stage keyframe" hidden>
+          <div class="shot__empty" id="kfEmpty">no keyframe</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- the face at zoom ----------
+         No pixel metric can judge a still mouth (2026-08-18); it has to be
+         eyeballed, and it has to be eyeballed BIG. This pane is the reason the
+         page exists, so it is not an afterthought below the fold. -->
+    <section class="card" aria-labelledby="h-face">
+      <div class="card__head">
+        <h2 id="h-face">Face at 3&times;</h2>
+        <span class="card__note">mouth and eyes — no metric can score these</span>
+      </div>
+      <div class="card__body card__body--flush">
+        <div class="shot shot--face">
+          <img id="faceImg" alt="the keyframe's face, magnified" hidden>
+          <div class="shot__empty" id="faceEmpty">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- wardrobe plate ---------- -->
+    <section class="card" aria-labelledby="h-plate">
+      <div class="card__head">
+        <h2 id="h-plate">Wardrobe plate</h2>
+        <span class="card__note mono" id="plateNote"></span>
+      </div>
+      <div class="card__body card__body--flush">
+        <div class="shot shot--plate">
+          <img id="plateImg" alt="the day's wardrobe reference plate" hidden>
+          <div class="shot__empty" id="plateEmpty">no plate</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- why he is dressed this way ---------- -->
+    <section class="card card--wide" aria-labelledby="h-why">
+      <div class="card__head">
+        <h2 id="h-why">Why this look</h2>
+        <span class="card__note mono" id="weatherNote"></span>
+      </div>
+      <div class="card__body">
+        <p class="rationale" id="rationale">—</p>
+        <div class="stats stats--look">
+          <div class="stat"><div class="stat__label">Plate identity</div>
+            <div class="stat__value mono" id="plateId">—</div></div>
+          <div class="stat"><div class="stat__label">Keyframe identity</div>
+            <div class="stat__value mono" id="kfId">—</div></div>
+          <div class="stat"><div class="stat__label">Slug</div>
+            <div class="stat__value mono" id="slug">—</div></div>
+        </div>
+        <details class="outfit">
+          <summary>the prompt the stylist wrote</summary>
+          <p class="outfit__text mono" id="outfit">—</p>
+        </details>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<script src="/look.js"></script>
+</body>
+</html>

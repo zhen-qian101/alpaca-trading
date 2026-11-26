@@ -1,0 +1,350 @@
+name: Portfolio
+
+# The public portfolio site (apps/portfolio): static assets on a Worker with no
+# script. Two jobs, so the app's build dependencies never share a runner with
+# a secret:
+#
+#   build   lints, typechecks, tests and builds with the synthetic fixture,
+#           then checks the build's licences file. No secret, no
+#           environment, no data: the built site goes on to the deploy as an
+#           artifact WITHOUT dist/data.
+#   deploy  (main only) installs nothing from the app's lockfile. It downloads
+#           that build, downloads the portfolio.json the home box exported to
+#           the R2 bucket alpaca-public (read-only token), gates it with
+#           apps/portfolio/schema/portfolio.schema.json (fails closed, and
+#           refuses a duplicate key), writes a re-serialisation of the value
+#           that passed into dist/data/ (never the downloaded bytes) and
+#           deploys with wrangler, installed on its own at the locked version
+#           and run directly (no third-party action holds the token).
+#           Its gate scripts are this repository's own TypeScript, run by
+#           Node with no packages.
+#
+# Setup, limits and take-down: docs/public-portfolio.md.
+#
+# The Worker may live in a Cloudflare account of its own (recommended: a token
+# that can edit Workers can edit every Worker in its account, the private
+# dashboard's included), so the bucket's account is a secret of its own:
+# R2_PUBLIC_ACCOUNT_ID for the download, CLOUDFLARE_ACCOUNT_ID for the deploy.
+# With one account for both, the two hold the same id.
+#
+# Logs of a public repository are public: no step prints the file, a value
+# from it, or a secret. The gate prints JSON pointers and rules only, and
+# wrangler runs at WRANGLER_LOG=warn, so a failed login never prints the
+# Cloudflare account's email or names.
+
+on:
+  pull_request:
+    paths:
+      - apps/portfolio/**
+      - web/public_export.py
+      - .github/workflows/portfolio.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/portfolio/**
+      - web/public_export.py
+      - .github/workflows/portfolio.yml
+  schedule:
+    # UTC, on the default branch only. GitHub delays or drops scheduled runs
+    # under load, worst at the top of the hour, so these sit at :07 and :37.
+    # About 20 runs a weekday and 4 a weekend day (108 a week); a run deploys
+    # only when the home box sent something new (see "Compare with the live
+    # site" below). The site states this cadence (apps/portfolio/src/lib/copy.ts
+    # CADENCE, web/public_export.py DATA_DELAY_NOTE) and warns once its figures
+    # are 26 hours old (src/lib/freshness.ts): keep all three in step.
+    #
+    # Weekdays, every 30 min from before the US open to after the close, in
+    # both EST and EDT: 13:07 ... 21:37 (18 runs).
+    - cron: "7,37 13-21 * * 1-5"
+    # Every day: overnight (picks up the nightly recap) and before the open.
+    - cron: "7 3,9 * * *"
+    # Weekends: two more, so a weekend day still gets 4 runs, 6 hours apart.
+    - cron: "7 15,21 * * 0,6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Lint, typecheck, test, build
+    # A scheduled run exists only to deploy: skip it while deploys are off.
+    if: github.event_name != 'schedule' || vars.PORTFOLIO_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/portfolio
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # pnpm's version comes from package.json `packageManager`.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: apps/portfolio/package.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: apps/portfolio/pnpm-lock.yaml
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # The licences of every bundled package, completed with the notices the
+      # npm packages leave out (vite.config.ts), at the root of the site.
+      - name: Licences in the build
+        run: node scripts/check-licenses.ts dist
+
+      # The build itself carries no account data: figures are staged at deploy
+      # time only.
+      - name: Build output has no data file
+        run: test ! -e dist/data
+
+      # Only when a deploy will follow (the deploy job's own condition), and
+      # before anything below could touch dist/.
+      - name: Hand the built site to the deploy job
+        if: >-
+          vars.PORTFOLIO_DEPLOY == 'true' &&
+          github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: portfolio-site
+          path: apps/portfolio/dist
+          if-no-files-found: error
+          retention-days: 1
+
+      # The deploy's two gates and its staging, on the synthetic fixture and a
+      # COPY of the build, so the uploaded build never holds a data file.
+      - name: Rehearse the deploy's gates on the fixture
+        run: |
+          set +x
+          rehearsal="$RUNNER_TEMP/rehearsal"
+          cp -R dist "$rehearsal"
+          node scripts/check-portfolio.ts fixtures/portfolio.json
+          node scripts/stage-data.ts --from fixtures/portfolio.json --dist "$rehearsal" --quiet
+          test "$(ls -A "$rehearsal/data")" = "portfolio.json"
+          test ! -e dist/data
+          rm -rf "${rehearsal:?}"
+
+  deploy:
+    name: Deploy with the latest figures
+    needs: build
+    # main only, never a pull request. The repository variable PORTFOLIO_DEPLOY
+    # is the on switch: until it is "true" this job is skipped (it is also the
+    # quickest way to pause deploys without editing this file).
+    if: >-
+      vars.PORTFOLIO_DEPLOY == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Secrets live in this environment; restrict it to the main branch
+    # (Settings -> Environments -> portfolio -> Deployment branches).
+    environment:
+      name: portfolio
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    # One deploy at a time, and never cancel one half way.
+    concurrency:
+      group: portfolio-deploy
+      cancel-in-progress: false
+    env:
+      BUCKET: alpaca-public
+      # Under $RUNNER_TEMP, outside the checkout; removed once staged.
+      DATA_FILE: portfolio/portfolio.json
+      # The deploy directory under $RUNNER_TEMP: wrangler.jsonc, dist/ and
+      # wrangler alone. No package.json, so nothing else can be installed there.
+      SITE_DIR: site
+      # The version in apps/portfolio/pnpm-lock.yaml (scripts/workflow.test.ts
+      # checks the two agree).
+      WRANGLER_VERSION: "4.168.0"
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      # Secrets cannot appear in `if:`, so their presence is read here first.
+      # Without all five every later step is skipped and the job still passes.
+      - name: Check for credentials
+        id: creds
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_PUBLIC_ACCOUNT_ID: ${{ secrets.R2_PUBLIC_ACCOUNT_ID }}
+          R2_PUBLIC_READ_KEY_ID: ${{ secrets.R2_PUBLIC_READ_KEY_ID }}
+          R2_PUBLIC_READ_SECRET: ${{ secrets.R2_PUBLIC_READ_SECRET }}
+        run: |
+          set +x
+          missing=""
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID R2_PUBLIC_ACCOUNT_ID R2_PUBLIC_READ_KEY_ID R2_PUBLIC_READ_SECRET; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -z "$missing" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::Not set in the portfolio environment:${missing}. See docs/public-portfolio.md."
+          fi
+
+      # For the gate scripts, the schema, wrangler.jsonc and .node-version.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+
+      # Node only: no pnpm, no package cache, no install from the lockfile.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+
+      - name: Download the built site
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: portfolio-site
+          path: ${{ runner.temp }}/${{ env.SITE_DIR }}/dist
+
+      - name: The build carries no data
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          site="$RUNNER_TEMP/$SITE_DIR"
+          test -f "$site/dist/index.html"
+          test ! -e "$site/dist/data"
+
+      # A token scoped READ-ONLY to the one bucket, in the account that holds
+      # the bucket (not necessarily the Worker's). The AWS CLI is preinstalled
+      # on ubuntu runners. Nothing from the object is printed.
+      - name: Download portfolio.json from R2
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_PUBLIC_READ_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_PUBLIC_READ_SECRET }}
+          R2_ACCOUNT: ${{ secrets.R2_PUBLIC_ACCOUNT_ID }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: "true"
+          AWS_PAGER: ""
+          # R2 does not need the newer default integrity headers.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          set +x
+          umask 077
+          data="$RUNNER_TEMP/$DATA_FILE"
+          mkdir -p "$(dirname "$data")"
+          aws s3 cp "s3://${BUCKET}/portfolio.json" "$data" \
+            --endpoint-url "https://${R2_ACCOUNT}.r2.cloudflarestorage.com" \
+            --region auto --only-show-errors --no-progress > /dev/null
+          test -s "$data"
+
+      - name: Gate the file with the JSON schema (fails closed)
+        if: steps.creds.outputs.ready == 'true'
+        working-directory: apps/portfolio
+        run: |
+          set +x
+          node scripts/check-portfolio.ts "$RUNNER_TEMP/$DATA_FILE"
+
+      # Second gate: the page's own closed-shape check, then a re-serialisation
+      # of the value that passed is written to dist/data/. The downloaded
+      # bytes are deleted, never copied. dist/data must hold that one file.
+      - name: Stage the checked value into dist/data
+        if: steps.creds.outputs.ready == 'true'
+        working-directory: apps/portfolio
+        run: |
+          set +x
+          site="$RUNNER_TEMP/$SITE_DIR"
+          node scripts/stage-data.ts --from "$RUNNER_TEMP/$DATA_FILE" --dist "$site/dist" --quiet
+          test "$(ls -A "$site/dist/data")" = "portfolio.json"
+          rm -f "${RUNNER_TEMP:?}/${DATA_FILE:?}"
+
+      # A scheduled run skips the deploy when the live site already serves this
+      # exact build (index.html names every hashed bundle) and this exact file:
+      # the home box sent nothing new, so a new Worker version would be a copy.
+      # Pushes and manual runs always deploy. Unknown site URL or any fetch
+      # error: deploy. Compares bytes; prints nothing from either side.
+      - name: Compare with the live site
+        id: live
+        if: steps.creds.outputs.ready == 'true'
+        working-directory: apps/portfolio
+        run: |
+          set +x
+          site="$RUNNER_TEMP/$SITE_DIR"
+          url="$(jq -r '.siteUrl // ""' site.config.json)"
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ] || [ -z "$url" ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          live="$RUNNER_TEMP/live"
+          mkdir -p "$live"
+          if curl -fsS --proto '=https' --max-time 20 -o "$live/portfolio.json" "$url/data/portfolio.json" \
+            && curl -fsS --proto '=https' --max-time 20 -o "$live/index.html" "$url/" \
+            && cmp -s "$live/portfolio.json" "$site/dist/data/portfolio.json" \
+            && cmp -s "$live/index.html" "$site/dist/index.html"; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Deploy skipped::The live site already serves this build and this file."
+          else
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+          rm -rf "${live:?}"
+
+      # The deploy directory gets wrangler.jsonc from the checkout, and
+      # wrangler alone, at the locked version (--prefix: there is no
+      # package.json there, so nothing else is installed). npm resolves
+      # wrangler's dependencies without the app's lockfile, so --before holds
+      # them to versions at least 7 days old, the cooldown Dependabot keeps.
+      # No secret is in this step's environment.
+      - name: Install wrangler alone
+        if: steps.creds.outputs.ready == 'true' && steps.live.outputs.deploy == 'true'
+        run: |
+          site="$RUNNER_TEMP/$SITE_DIR"
+          cp "$GITHUB_WORKSPACE/apps/portfolio/wrangler.jsonc" "$site/wrangler.jsonc"
+          npm install --prefix "$site" --no-save --no-package-lock --no-audit --no-fund --loglevel=error \
+            --before="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)" "wrangler@${WRANGLER_VERSION}"
+          test "$(node -p "require(process.argv[1]).version" "$site/node_modules/wrangler/package.json")" = "$WRANGLER_VERSION"
+          test ! -e "$site/package.json"
+
+      # That wrangler, run directly: no third-party action holds the token.
+      # Logs of a public repository are public, so wrangler prints warnings
+      # and errors only (WRANGLER_LOG=warn). On an authentication error it
+      # otherwise runs `whoami`, which prints the email of the token's user
+      # and a table of every account name and id the token can see; GitHub
+      # masks secrets, not those. The error itself still prints. No debug log
+      # file is written either. The site's URL comes from wrangler's own
+      # output file, never from its log.
+      - name: Deploy
+        id: deploy
+        if: steps.creds.outputs.ready == 'true' && steps.live.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_LOG: warn
+          WRANGLER_WRITE_LOGS: "false"
+        run: |
+          set +x
+          site="$RUNNER_TEMP/$SITE_DIR"
+          out="$RUNNER_TEMP/wrangler-output.ndjson"
+          rm -f "$out"
+          cd "$site"
+          WRANGLER_OUTPUT_FILE_PATH="$out" ./node_modules/.bin/wrangler deploy
+          url="$(jq -rs '[.[] | select(.type == "deploy")] | last | .targets[0] // empty' "$out" 2>/dev/null || true)"
+          rm -f "$out"
+          echo "deployment-url=$url" >> "$GITHUB_OUTPUT"
+          if [ -n "$url" ]; then echo "Deployed to $url"; fi

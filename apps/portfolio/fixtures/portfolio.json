@@ -1,0 +1,252 @@
+{
+  "meta": {"schema": 1, "as_of": "2026-06-12T22:05:00Z", "data_delay": "Exported about every 15 minutes and published about every 30 minutes in US market hours on weekdays, every 6 hours otherwise: positions and trades can trail the account by about 45 minutes, or 6 hours out of hours. Equity and returns stop at the last completed session. Paper account.", "generated_by": "public_export/1.0.0", "unavailable": []},
+  "account": {
+    "paper": true,
+    "start_date": "2026-01-05",
+    "start_equity": 100000.0,
+    "equity": 102907.77,
+    "day_pl_pct": -0.01182,
+    "total_return_pct": 0.029078,
+    "max_drawdown_pct": -0.082306,
+    "best_day": {"date": "2026-02-12", "return_pct": 0.016058},
+    "worst_day": {"date": "2026-04-17", "return_pct": -0.022064},
+    "daily": [
+      {"date": "2026-01-05", "equity": 100000.0},
+      {"date": "2026-01-06", "equity": 99829.71},
+      {"date": "2026-01-07", "equity": 100349.11},
+      {"date": "2026-01-08", "equity": 100205.12},
+      {"date": "2026-01-09", "equity": 99981.1},
+      {"date": "2026-01-12", "equity": 99204.23},
+      {"date": "2026-01-13", "equity": 99073.31},
+      {"date": "2026-01-14", "equity": 100124.21},
+      {"date": "2026-01-15", "equity": 100566.49},
+      {"date": "2026-01-16", "equity": 101565.31},
+      {"date": "2026-01-19", "equity": 101853.77},
+      {"date": "2026-01-20", "equity": 102276.76},
+      {"date": "2026-01-21", "equity": 102508.72},
+      {"date": "2026-01-22", "equity": 101033.15},
+      {"date": "2026-01-23", "equity": 101871.45},
+      {"date": "2026-01-26", "equity": 102396.85},
+      {"date": "2026-01-27", "equity": 102917.98},
+      {"date": "2026-01-28", "equity": 101413.08},
+      {"date": "2026-01-29", "equity": 99882.25},
+      {"date": "2026-01-30", "equity": 99142.47},
+      {"date": "2026-02-02", "equity": 98784.2},
+      {"date": "2026-02-03", "equity": 99115.03},
+      {"date": "2026-02-04", "equity": 99133.54},
+      {"date": "2026-02-05", "equity": 99657.83},
+      {"date": "2026-02-06", "equity": 99141.59},
+      {"date": "2026-02-09", "equity": 99476.52},
+      {"date": "2026-02-10", "equity": 99889.09},
+      {"date": "2026-02-11", "equity": 99354.66},
+      {"date": "2026-02-12", "equity": 100950.07},
+      {"date": "2026-02-13", "equity": 101516.35},
+      {"date": "2026-02-16", "equity": 102670.9},
+      {"date": "2026-02-17", "equity": 102159.29},
+      {"date": "2026-02-18", "equity": 101540.65},
+      {"date": "2026-02-19", "equity": 101287.16},
+      {"date": "2026-02-20", "equity": 101250.92},
+      {"date": "2026-02-23", "equity": 101887.66},
+      {"date": "2026-02-24", "equity": 102176.6},
+      {"date": "2026-02-25", "equity": 101826.52},
+      {"date": "2026-02-26", "equity": 101010.66},
+      {"date": "2026-02-27", "equity": 100598.0},
+      {"date": "2026-03-02", "equity": 101763.76},
+      {"date": "2026-03-03", "equity": 101084.84},
+      {"date": "2026-03-04", "equity": 101368.16},
+      {"date": "2026-03-05", "equity": 101818.1},
+      {"date": "2026-03-06", "equity": 100514.05},
+      {"date": "2026-03-09", "equity": 100618.21},
+      {"date": "2026-03-10", "equity": 101861.47},
+      {"date": "2026-03-11", "equity": 100075.91},
+      {"date": "2026-03-12", "equity": 99846.3},
+      {"date": "2026-03-13", "equity": 99810.83},
+      {"date": "2026-03-16", "equity": 99136.57},
+      {"date": "2026-03-17", "equity": 99639.84},
+      {"date": "2026-03-18", "equity": 99643.77},
+      {"date": "2026-03-19", "equity": 98390.06},
+      {"date": "2026-03-20", "equity": 99182.16},
+      {"date": "2026-03-23", "equity": 99839.14},
+      {"date": "2026-03-24", "equity": 100748.93},
+      {"date": "2026-03-25", "equity": 102115.63},
+      {"date": "2026-03-26", "equity": 102509.82},
+      {"date": "2026-03-27", "equity": 102681.37},
+      {"date": "2026-03-30", "equity": 101542.38},
+      {"date": "2026-03-31", "equity": 102165.75},
+      {"date": "2026-04-01", "equity": 101664.54},
+      {"date": "2026-04-02", "equity": 101311.33},
+      {"date": "2026-04-03", "equity": 100218.88},
+      {"date": "2026-04-06", "equity": 99406.25},
+      {"date": "2026-04-07", "equity": 98990.72},
+      {"date": "2026-04-08", "equity": 100198.36},
+      {"date": "2026-04-09", "equity": 98426.24},
+      {"date": "2026-04-10", "equity": 97194.01},
+      {"date": "2026-04-13", "equity": 97461.7},
+      {"date": "2026-04-14", "equity": 98786.22},
+      {"date": "2026-04-15", "equity": 99359.82},
+      {"date": "2026-04-16", "equity": 97720.43},
+      {"date": "2026-04-17", "equity": 95564.32},
+      {"date": "2026-04-20", "equity": 95929.05},
+      {"date": "2026-04-21", "equity": 95350.95},
+      {"date": "2026-04-22", "equity": 94447.21},
+      {"date": "2026-04-23", "equity": 95334.67},
+      {"date": "2026-04-24", "equity": 96337.22},
+      {"date": "2026-04-27", "equity": 96531.37},
+      {"date": "2026-04-28", "equity": 96802.82},
+      {"date": "2026-04-29", "equity": 97239.33},
+      {"date": "2026-04-30", "equity": 98692.67},
+      {"date": "2026-05-01", "equity": 99301.73},
+      {"date": "2026-05-04", "equity": 99824.84},
+      {"date": "2026-05-05", "equity": 100376.84},
+      {"date": "2026-05-06", "equity": 99020.27},
+      {"date": "2026-05-07", "equity": 100221.94},
+      {"date": "2026-05-08", "equity": 101143.57},
+      {"date": "2026-05-11", "equity": 101686.37},
+      {"date": "2026-05-12", "equity": 99940.94},
+      {"date": "2026-05-13", "equity": 99430.93},
+      {"date": "2026-05-14", "equity": 100244.35},
+      {"date": "2026-05-15", "equity": 98670.42},
+      {"date": "2026-05-18", "equity": 98566.2},
+      {"date": "2026-05-19", "equity": 99529.76},
+      {"date": "2026-05-20", "equity": 98414.96},
+      {"date": "2026-05-21", "equity": 99900.14},
+      {"date": "2026-05-22", "equity": 100456.35},
+      {"date": "2026-05-25", "equity": 100380.88},
+      {"date": "2026-05-26", "equity": 100734.6},
+      {"date": "2026-05-27", "equity": 101384.18},
+      {"date": "2026-05-28", "equity": 101554.86},
+      {"date": "2026-05-29", "equity": 102662.92},
+      {"date": "2026-06-01", "equity": 102113.27},
+      {"date": "2026-06-02", "equity": 101793.39},
+      {"date": "2026-06-03", "equity": 102808.8},
+      {"date": "2026-06-04", "equity": 102895.28},
+      {"date": "2026-06-05", "equity": 102141.66},
+      {"date": "2026-06-08", "equity": 103073.0},
+      {"date": "2026-06-09", "equity": 104494.32},
+      {"date": "2026-06-10", "equity": 104138.68},
+      {"date": "2026-06-11", "equity": 102907.77}
+    ]
+  },
+  "positions": {
+    "equities": [
+      {"symbol": "NOVA", "side": "long", "qty": 40.0, "avg_entry_price": 250.5, "stop_pct": 0.02}
+    ],
+    "options": [
+      {"underlying": "VOLT", "type": "put", "side": "short", "strike": 35.0, "expiry": "2026-06-19", "qty": 1.0, "premium_received": 42.0}
+    ]
+  },
+  "trades": {
+    "stats": {"round_trips": 20, "wins": 10, "losses": 10, "win_rate": 0.5, "avg_win": 196.19, "avg_loss": -164.22, "avg_win_pct": 0.015822, "avg_loss_pct": -0.019763, "profit_factor": 1.1946, "realized_pnl": 319.61},
+    "round_trips": [
+      {"symbol": "NOVA", "side": "long", "qty": 68.0, "entry_price": 271.74, "exit_price": 275.61, "entry_at": "2026-05-19T14:30:00Z", "exit_at": "2026-05-19T18:45:00Z", "pnl": 263.16, "pnl_pct": 0.014242, "strategy": null},
+      {"symbol": "ACME", "side": "long", "qty": 63.0, "entry_price": 336.99, "exit_price": 347.93, "entry_at": "2026-05-12T14:30:00Z", "exit_at": "2026-05-12T18:45:00Z", "pnl": 689.22, "pnl_pct": 0.032464, "strategy": null},
+      {"symbol": "ZEPH", "side": "long", "qty": 102.0, "entry_price": 119.155, "exit_price": 118.95, "entry_at": "2026-05-05T14:30:00Z", "exit_at": "2026-05-05T19:00:00Z", "pnl": -20.91, "pnl_pct": -0.00172, "strategy": null},
+      {"symbol": "QBIT/USD", "side": "long", "qty": 0.25, "entry_price": 100.86, "exit_price": 97.64, "entry_at": "2026-04-28T14:30:00Z", "exit_at": "2026-04-28T18:45:00Z", "pnl": -0.8, "pnl_pct": -0.031925, "strategy": null},
+      {"symbol": "LUMA", "side": "long", "qty": 37.0, "entry_price": 30.64, "exit_price": 29.87, "entry_at": "2026-04-21T14:30:00Z", "exit_at": "2026-04-21T18:45:00Z", "pnl": -28.49, "pnl_pct": -0.025131, "strategy": null},
+      {"symbol": "ORBX", "side": "long", "qty": 27.0, "entry_price": 184.85, "exit_price": 190.01, "entry_at": "2026-04-14T14:30:00Z", "exit_at": "2026-04-14T18:45:00Z", "pnl": 139.32, "pnl_pct": 0.027915, "strategy": null},
+      {"symbol": "NOVA", "side": "long", "qty": 23.0, "entry_price": 220.1, "exit_price": 220.27, "entry_at": "2026-04-07T14:30:00Z", "exit_at": "2026-04-07T18:45:00Z", "pnl": 3.91, "pnl_pct": 0.000772, "strategy": null},
+      {"symbol": "ACME", "side": "long", "qty": 54.0, "entry_price": 79.25, "exit_price": 79.09, "entry_at": "2026-03-31T14:30:00Z", "exit_at": "2026-03-31T18:45:00Z", "pnl": -8.64, "pnl_pct": -0.002019, "strategy": null},
+      {"symbol": "ZEPH", "side": "long", "qty": 86.0, "entry_price": 392.52, "exit_price": 384.34, "entry_at": "2026-03-24T14:30:00Z", "exit_at": "2026-03-24T18:45:00Z", "pnl": -703.48, "pnl_pct": -0.02084, "strategy": null},
+      {"symbol": "QBIT/USD", "side": "long", "qty": 0.5, "entry_price": 197.815, "exit_price": 194.49, "entry_at": "2026-03-17T14:30:00Z", "exit_at": "2026-03-17T19:00:00Z", "pnl": -1.66, "pnl_pct": -0.016809, "strategy": null},
+      {"symbol": "LUMA", "side": "long", "qty": 29.0, "entry_price": 244.51, "exit_price": 247.23, "entry_at": "2026-03-10T14:30:00Z", "exit_at": "2026-03-10T18:45:00Z", "pnl": 78.88, "pnl_pct": 0.011124, "strategy": null},
+      {"symbol": "ORBX", "side": "long", "qty": 20.0, "entry_price": 295.42, "exit_price": 297.49, "entry_at": "2026-03-03T15:30:00Z", "exit_at": "2026-03-03T19:45:00Z", "pnl": 41.4, "pnl_pct": 0.007007, "strategy": null},
+      {"symbol": "NOVA", "side": "long", "qty": 69.0, "entry_price": 172.53, "exit_price": 171.04, "entry_at": "2026-02-24T15:30:00Z", "exit_at": "2026-02-24T19:45:00Z", "pnl": -102.81, "pnl_pct": -0.008636, "strategy": null},
+      {"symbol": "ACME", "side": "long", "qty": 52.0, "entry_price": 52.96, "exit_price": 54.66, "entry_at": "2026-02-17T15:30:00Z", "exit_at": "2026-02-17T19:45:00Z", "pnl": 88.4, "pnl_pct": 0.0321, "strategy": null},
+      {"symbol": "ZEPH", "side": "long", "qty": 32.0, "entry_price": 184.89, "exit_price": 181.04, "entry_at": "2026-02-10T15:30:00Z", "exit_at": "2026-02-10T19:45:00Z", "pnl": -123.2, "pnl_pct": -0.020823, "strategy": null},
+      {"symbol": "QBIT/USD", "side": "long", "qty": 0.25, "entry_price": 317.28, "exit_price": 317.92, "entry_at": "2026-02-03T15:30:00Z", "exit_at": "2026-02-03T19:45:00Z", "pnl": 0.16, "pnl_pct": 0.002017, "strategy": null},
+      {"symbol": "LUMA", "side": "long", "qty": 50.0, "entry_price": 367.55, "exit_price": 375.735, "entry_at": "2026-01-27T15:30:00Z", "exit_at": "2026-01-27T20:00:00Z", "pnl": 409.25, "pnl_pct": 0.022269, "strategy": null},
+      {"symbol": "ORBX", "side": "long", "qty": 71.0, "entry_price": 365.5, "exit_price": 360.39, "entry_at": "2026-01-20T15:30:00Z", "exit_at": "2026-01-20T19:45:00Z", "pnl": -362.81, "pnl_pct": -0.013981, "strategy": null},
+      {"symbol": "NOVA", "side": "long", "qty": 88.0, "entry_price": 339.37, "exit_price": 342.19, "entry_at": "2026-01-13T15:30:00Z", "exit_at": "2026-01-13T19:45:00Z", "pnl": 248.16, "pnl_pct": 0.00831, "strategy": null},
+      {"symbol": "ACME", "side": "long", "qty": 35.0, "entry_price": 148.34, "exit_price": 140.07, "entry_at": "2026-01-06T15:30:00Z", "exit_at": "2026-01-06T19:45:00Z", "pnl": -289.45, "pnl_pct": -0.05575, "strategy": null}
+    ]
+  },
+  "signals": {
+    "date": "2026-06-12",
+    "rows": [
+      {"symbol": "ACME", "bias": "long", "priority": 3, "suggested_size": 0.97, "contingencies": []},
+      {"symbol": "NOVA", "bias": "long", "priority": 2, "suggested_size": 0.97, "contingencies": []},
+      {"symbol": "FERN", "bias": "flat", "priority": 0, "suggested_size": 0.0, "contingencies": []},
+      {"symbol": "KITE", "bias": "flat", "priority": 0, "suggested_size": 0.0, "contingencies": []},
+      {"symbol": "LUMA", "bias": "long", "priority": 0, "suggested_size": 0.97, "contingencies": []},
+      {
+        "symbol": "ORBX",
+        "bias": "flat",
+        "priority": 0,
+        "suggested_size": 0.0,
+        "contingencies": [
+          {"condition": "close_above", "level": 61.5, "valid_until": "2026-06-16T04:00:00Z"}
+        ]
+      },
+      {"symbol": "PYRO", "bias": "short", "priority": 0, "suggested_size": 0.0, "contingencies": []},
+      {"symbol": "QBIT/USD", "bias": "flat", "priority": 0, "suggested_size": 0.0, "contingencies": []},
+      {"symbol": "VOLT", "bias": "flat", "priority": 0, "suggested_size": 0.0, "contingencies": []},
+      {
+        "symbol": "ZEPH",
+        "bias": "flat",
+        "priority": 0,
+        "suggested_size": 0.0,
+        "contingencies": [
+          {"condition": "close_below", "level": 12.25, "valid_until": "2026-06-15T20:00:00Z"}
+        ]
+      }
+    ]
+  },
+  "strategy": {
+    "symbols": [
+      {
+        "symbol": "ACME",
+        "enabled": true,
+        "on_watchlist": true,
+        "interval": "1h",
+        "stop_pct": 0.02,
+        "deploy": 0.97,
+        "strategies": [
+          {"type": "macd_sma", "fast_len": 12.0, "slow_len": 26.0, "signal_len": 9.0, "veryslow_len": 150.0},
+          {"type": "bollinger_rsi", "rsi_length": 6.0, "bb_length": 20.0, "bb_mult": 1.5}
+        ]
+      },
+      {
+        "symbol": "NOVA",
+        "enabled": true,
+        "on_watchlist": true,
+        "interval": "1h",
+        "stop_pct": 0.02,
+        "deploy": 0.97,
+        "strategies": [
+          {"type": "macd_sma", "fast_len": 12.0, "slow_len": 26.0, "signal_len": 9.0, "veryslow_len": 150.0},
+          {"type": "bollinger_rsi", "rsi_length": 6.0, "bb_length": 20.0, "bb_mult": 1.5}
+        ]
+      },
+      {
+        "symbol": "ORBX",
+        "enabled": true,
+        "on_watchlist": true,
+        "interval": "1h",
+        "stop_pct": 0.03,
+        "deploy": 0.97,
+        "strategies": [
+          {"type": "ema", "fast": 12.0, "slow": 50.0, "window": 200.0}
+        ]
+      },
+      {
+        "symbol": "QBIT/USD",
+        "enabled": false,
+        "on_watchlist": true,
+        "interval": "1h",
+        "stop_pct": 0.06,
+        "deploy": 0.97,
+        "strategies": [
+          {"type": "ema", "fast": 20.0, "slow": 75.0, "window": 300.0}
+        ]
+      },
+      {"symbol": "ZEPH", "enabled": true, "on_watchlist": true, "interval": "1h", "stop_pct": 0.02, "deploy": 0.97, "strategies": []}
+    ],
+    "risk": {"daily_loss_limit": 0.05, "daily_loss_hard_cap": 0.05, "max_position_shares_cap": 10000, "allow_extended_hours": true, "sleeve_reserve_pct": 0.2}
+  },
+  "recaps": [
+    {"date": "2026-06-12", "youtube_id": "FAKEyt00004", "duration_s": 65.0},
+    {"date": "2026-06-11", "youtube_id": "FAKEyt00003", "duration_s": 64.0},
+    {"date": "2026-06-10", "youtube_id": "FAKEyt00002", "duration_s": 63.0},
+    {"date": "2026-06-09", "youtube_id": "FAKEyt00001", "duration_s": 62.0}
+  ]
+}

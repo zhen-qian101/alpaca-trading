@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alpaca-trading-system"
+version = "0.1.0"
+description = "Self-hosted signal engine → relay library → Alpaca (paper) quant system with a Claude decision/research layer."
+requires-python = ">=3.11"
+# Core: what relay/, sigengine/ and web/ import directly. pandas/numpy are core,
+# not backtest-only, because relay/bars_db.py (the live bar cache) uses them.
+dependencies = [
+    "alpaca-py>=0.43",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# backtest/ is also LIVE code: sigengine.engine imports its strategy modules, and
+# ema_scaled_rolling.load_ohlcv is the engine's yfinance fallback.
+backtest = ["yfinance>=0.2"]
+ibkr = ["ib_async>=1.0"]
+# web/publisher.py: real R2 uploads only (--out-dir needs nothing extra). Install it
+# with `-c requirements/constraints.txt`, which pins boto3 and its dependencies exactly.
+publish = ["boto3>=1.34"]
+# jsonschema is the reference validator tests/test_portfolio_schema.py checks
+# web/schema_gate.py against (the gate itself needs no package). It used to
+# arrive only through vectorbt; without it those tests skip, so it is declared.
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "httpx>=0.27", "pillow>=10", "imageio>=2.30",
+       "ruff>=0.12", "jsonschema>=4.18"]
+
+# A flat layout with several top-level packages: list them, or setuptools refuses
+# to guess ("Multiple top-level packages discovered").
+[tool.setuptools.packages.find]
+include = ["relay*", "sigengine*", "agent*", "web*", "backtest*", "briefing*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+extend-exclude = ["apps", "node_modules"]
+
+[tool.ruff.lint]
+# Spelled out rather than inherited: ruff's default rule set grows between
+# releases (0.17 flags ~100 more items than 0.12 on this tree), and the gate
+# should only move when this line does.
+select = ["E4", "E7", "E9", "F"]
+# `l` for a bar's low is idiomatic in OHLC code.
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# Imports placed after the CSP_CONFIG_FILE rationale on purpose; the module
+# fires real orders, so it is not reshuffled for style.
+"relay/csp_manager.py" = ["E402"]

@@ -1,0 +1,417 @@
+{
+  "schema": 1,
+  "as_of": "2026-03-04T21:05:00+00:00",
+  "publisher": {
+    "version": "0.1.0",
+    "host": "home",
+    "approval": null
+  },
+  "portfolio": {
+    "equity": 102161.29,
+    "last_equity": 100475.91,
+    "cash": 3377.02,
+    "buying_power": 6754.04,
+    "day_pl": 1685.38,
+    "day_pl_pct": 0.016773970994639287,
+    "paper": true,
+    "status": "ACTIVE",
+    "positions": [
+      {
+        "symbol": "ACME",
+        "side": "long",
+        "qty": 325.0,
+        "avg_entry_price": 298.32,
+        "current_price": 303.9516,
+        "market_value": 98784.27,
+        "cost_basis": 96954.0,
+        "unrealized_pl": 1830.27,
+        "unrealized_plpc": 0.018877715205148915,
+        "stop_pct": 0.02,
+        "stop_price": 292.3536,
+        "stop_distance_pct": 0.039671137964437664,
+        "priority": 2,
+        "bias": "long"
+      }
+    ],
+    "halt": {
+      "limit": 0.05,
+      "hard_cap": 0.05,
+      "tripped": false,
+      "used_frac": 0.0,
+      "applies_to": "buys only — exits always allowed"
+    }
+  },
+  "board": {
+    "date": "2026-03-04",
+    "rows": [
+      {
+        "symbol": "ACME",
+        "bias": "long",
+        "priority": 2,
+        "suggested_size": 0.97,
+        "max_position": 2000,
+        "contingencies": []
+      },
+      {
+        "symbol": "ORBT",
+        "bias": "long",
+        "priority": 1,
+        "suggested_size": 0.97,
+        "max_position": 2000,
+        "contingencies": []
+      },
+      {
+        "symbol": "NOVA",
+        "bias": "flat",
+        "priority": 0,
+        "suggested_size": 0.0,
+        "max_position": 2000,
+        "contingencies": [
+          {
+            "condition": "close_above",
+            "level": 57.5,
+            "action": "long",
+            "valid_until": "2026-03-06T14:30:00+00:00",
+            "reason": "A close back above the prior range high would confirm the breakout the earnings guide-up set up."
+          }
+        ]
+      },
+      {
+        "symbol": "QBIT/USD",
+        "bias": "flat",
+        "priority": 0,
+        "suggested_size": 0.0,
+        "max_position": 2000,
+        "contingencies": []
+      }
+    ],
+    "max_open_positions": 1,
+    "daily_loss_limit": 0.05,
+    "allow_extended_hours": false,
+    "notes": {
+      "_": "Breadth narrowed into the close; semis led and defensives lagged. Rates were flat, so the move was positioning rather than macro.",
+      "ACME": "Holding the 50-hour basis after the guide-up; trend intact while the histogram stays positive.",
+      "ORBT": "Second candidate: cleaner chart, weaker catalyst.",
+      "NOVA": "Flat until it reclaims 57.50 on a closing basis.",
+      "QBIT/USD": "Range-bound; no edge either side."
+    },
+    "mtime": 1772629361.0
+  },
+  "journal": {
+    "rows": [
+      {
+        "event": "signal_skip",
+        "ts": 1772654404.0,
+        "ticker": "NOVA",
+        "action": "buy",
+        "strategy": "macd_sma",
+        "bar_ts": "2026-03-04T19:00:00+00:00",
+        "reason": "bias flat and no contingency triggered",
+        "status": "skip",
+        "_ts": 1772654404.0
+      },
+      {
+        "event": "risk_block",
+        "ts": 1772650806.0,
+        "ticker": "ORBT",
+        "action": "buy",
+        "qty": 96.0,
+        "reason": "max_open_positions reached (1)",
+        "status": "blocked",
+        "_ts": 1772650806.0
+      },
+      {
+        "event": "quote_fallback",
+        "ts": 1772647203.0,
+        "ticker": "ACME",
+        "side": "buy",
+        "reason": "quote stale; priced off last trade",
+        "quote_price": 239.62,
+        "last_trade": 239.7,
+        "bid": 239.55,
+        "ask": 239.69,
+        "deviation": 0.0003,
+        "max_deviation": 0.01,
+        "quote_age_sec": 41.0,
+        "trade_age_sec": 2.5,
+        "reference": 239.7,
+        "floored": false,
+        "max_markdown": 0.002,
+        "two_sided_book": true,
+        "quote_error": null,
+        "_ts": 1772647203.0
+      },
+      {
+        "event": "correction",
+        "ts": 1772487000.0,
+        "ticker": "NOVA",
+        "voids_ts": [
+          1772478000.5
+        ],
+        "reason": "duplicate close journaled during a retry",
+        "_ts": 1772487000.0
+      },
+      {
+        "event": "stale_entry_skipped",
+        "ts": 1772467202.0,
+        "ticker": "QBIT/USD",
+        "action": "buy",
+        "strategy": "bollinger_rsi",
+        "bar_ts": "2026-03-02T13:00:00+00:00",
+        "age_bars": 3.0,
+        "max_bars": 2,
+        "signal_reason": "rsi_bb_long",
+        "reason": "signal older than max_bars",
+        "_ts": 1772467202.0
+      },
+      {
+        "event": "order_ok",
+        "ts": "2026-03-02T14:00:05+00:00",
+        "ticker": "NOVA",
+        "action": "close",
+        "qty": null,
+        "status": "closed",
+        "_ts": 1772460005.0
+      },
+      {
+        "event": "order_ok",
+        "ts": 1771509609.0,
+        "ticker": "ACME",
+        "action": "buy",
+        "qty": 325.0,
+        "status": "submitted_market",
+        "_ts": 1771509609.0
+      },
+      {
+        "event": "rotation_close",
+        "ts": 1771509607.0,
+        "ticker": "ORBT",
+        "action": "close",
+        "new_pick": "ACME",
+        "qty": 310.0,
+        "status": "closed",
+        "reason": "rotating into higher-priority candidate",
+        "_ts": 1771509607.0
+      }
+    ],
+    "engine": {
+      "symbols": [
+        {
+          "symbol": "ACME",
+          "last_bar": 1772654400.0,
+          "behind_s": 0.0,
+          "enabled": true
+        },
+        {
+          "symbol": "NOVA",
+          "last_bar": 1772650800.0,
+          "behind_s": 3600.0,
+          "enabled": true
+        },
+        {
+          "symbol": "OFFL",
+          "last_bar": 1764885600.0,
+          "behind_s": 7768800.0,
+          "enabled": false
+        },
+        {
+          "symbol": "ORBT",
+          "last_bar": 1772654400.0,
+          "behind_s": 0.0,
+          "enabled": true
+        },
+        {
+          "symbol": "QBIT/USD",
+          "last_bar": 1772654400.0,
+          "behind_s": 0.0,
+          "enabled": true
+        }
+      ],
+      "newest_bar": 1772654400.0,
+      "last_poll": 1772658180.0,
+      "running": true,
+      "polling": true,
+      "stale_after_sec": 900.0,
+      "log_mtime": 1772658180.0,
+      "log_tail": [
+        "2026-03-04 16:00:02 [ACME] 1h bars ok (ibkr) last=2026-03-04 15:00",
+        "2026-03-04 16:00:03 [NOVA] yfinance fallback: ibkr returned 0 bars",
+        "2026-03-04 16:00:03 [ORBT] 1h bars ok (ibkr) last=2026-03-04 15:00",
+        "2026-03-04 16:00:04 [QBIT/USD] 1h bars ok (alpaca) last=2026-03-04 21:00",
+        "2026-03-04 16:00:04 poll done in 2.1s; 0 orders"
+      ],
+      "yfinance_fallback": [
+        "NOVA"
+      ]
+    }
+  },
+  "executions": {
+    "rows": [
+      {
+        "ts": 1772449215.0,
+        "symbol": "QBIT/USD",
+        "side": "sell",
+        "qty": 0.85,
+        "price": 2045.83,
+        "entry_price": 1667.92,
+        "exit_price": 2045.83,
+        "pnl": 321.22,
+        "pnl_pct": 0.22657561513741653,
+        "order_type": "market",
+        "held_after": 0.0
+      },
+      {
+        "ts": 1772197204.0,
+        "symbol": "QBIT/USD",
+        "side": "buy",
+        "qty": 0.85,
+        "price": 1667.92,
+        "entry_price": 1667.92,
+        "exit_price": null,
+        "pnl": null,
+        "pnl_pct": null,
+        "order_type": "market",
+        "held_after": 0.85
+      },
+      {
+        "ts": 1771509611.0,
+        "symbol": "ACME",
+        "side": "buy",
+        "qty": 325.0,
+        "price": 298.32,
+        "entry_price": 298.32,
+        "exit_price": null,
+        "pnl": null,
+        "pnl_pct": null,
+        "order_type": "market",
+        "held_after": 325.0
+      },
+      {
+        "ts": 1771509608.0,
+        "symbol": "ORBT",
+        "side": "sell",
+        "qty": 310.0,
+        "price": 41.92,
+        "entry_price": 40.1,
+        "exit_price": 41.92,
+        "pnl": 564.2,
+        "pnl_pct": 0.04538653366583545,
+        "order_type": "market",
+        "held_after": 0.0
+      },
+      {
+        "ts": 1771333208.0,
+        "symbol": "ORBT260320P00040000",
+        "side": "sell",
+        "qty": 1.0,
+        "price": 1.35,
+        "entry_price": null,
+        "exit_price": 1.35,
+        "pnl": null,
+        "pnl_pct": null,
+        "order_type": "limit",
+        "held_after": 0.0
+      },
+      {
+        "ts": 1771164008.0,
+        "symbol": "ORBT",
+        "side": "buy",
+        "qty": 310.0,
+        "price": 40.1,
+        "entry_price": 40.1,
+        "exit_price": null,
+        "pnl": null,
+        "pnl_pct": null,
+        "order_type": "market",
+        "held_after": 310.0
+      },
+      {
+        "ts": 1770984008.0,
+        "symbol": "NOVA",
+        "side": "sell",
+        "qty": 180.0,
+        "price": 52.04,
+        "entry_price": 55.12,
+        "exit_price": 52.04,
+        "pnl": -554.4,
+        "pnl_pct": -0.05587808417997098,
+        "order_type": "limit",
+        "held_after": 0.0
+      },
+      {
+        "ts": 1770818408.0,
+        "symbol": "NOVA",
+        "side": "buy",
+        "qty": 180.0,
+        "price": 55.12,
+        "entry_price": 55.12,
+        "exit_price": null,
+        "pnl": null,
+        "pnl_pct": null,
+        "order_type": "market",
+        "held_after": 180.0
+      }
+    ],
+    "realized_pnl": 331.02,
+    "round_trips": 3,
+    "win_rate": 0.6666666666666666
+  },
+  "symbols": [
+    "ACME",
+    "NOVA",
+    "ORBT",
+    "QBIT/USD"
+  ],
+  "look": {
+    "date": "2026-03-04",
+    "session_date": "2026-03-04",
+    "host": "Demo Host",
+    "host_json": "demo-host.json",
+    "stylist_enabled": true,
+    "locked_keyframe": "briefing/assets/demo-host/keyframes/locked.png",
+    "dates": [
+      "2026-03-04",
+      "2026-03-03",
+      "2026-03-02"
+    ],
+    "exists": true,
+    "weather": {
+      "date": "2026-03-04",
+      "tmax_c": 23.4,
+      "tmin_c": 14.1,
+      "precip_mm": 0.2,
+      "sky": "partly cloudy",
+      "season": "early autumn"
+    },
+    "style": {
+      "slug": "navy-crewneck-stone-chinos",
+      "outfit": "navy merino crewneck over a white tee, stone chinos",
+      "rationale": "Mild and dry: one warm layer, nothing that reads as formal."
+    },
+    "plate_identity": 0.951,
+    "keyframe_identity": 0.912,
+    "approved": null,
+    "approved_at": null,
+    "renders_with": "locked",
+    "plate_url": "/api/look/asset?date=2026-03-04&kind=plate&v=888ecf1f6db0",
+    "keyframe_url": "/api/look/asset?date=2026-03-04&kind=keyframe&v=0baf886baaac"
+  },
+  "options": {
+    "enabled": true,
+    "shadow": false,
+    "underlying": "ORBT",
+    "short_put": {
+      "symbol": "ORBT260320P00040000",
+      "contracts": 1.0,
+      "strike": 40.0,
+      "expiry": "2026-03-20",
+      "avg_entry_price": 1.35,
+      "current_price": 0.62,
+      "market_value": -62.0,
+      "unrealized": 73.0,
+      "underlying_price": 44.85,
+      "strike_distance_pct": 0.12125
+    },
+    "assigned": null
+  }
+}

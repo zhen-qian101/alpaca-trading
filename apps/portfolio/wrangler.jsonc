@@ -1,0 +1,30 @@
+/**
+ * Public portfolio: a Worker with STATIC ASSETS ONLY.
+ *
+ * There is no "main" script, no binding and no route beyond workers.dev, so
+ * every request is a free static-asset request and nothing here can run code
+ * or read anything but the files in dist/. The data is one static file,
+ * dist/data/portfolio.json, staged into the build at deploy time
+ * (`pnpm stage-data --from <file>`; see README.md and docs/public-portfolio.md).
+ *
+ * scripts/config.test.ts fails if a script, binding, route or variable is
+ * ever added here.
+ *
+ * Reference: https://developers.cloudflare.com/workers/static-assets/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "alpaca-portfolio",
+	"compatibility_date": "2026-11-23",
+
+	"workers_dev": true,
+	// One public hostname is enough; per-version preview URLs would add more.
+	"preview_urls": false,
+
+	"assets": {
+		"directory": "./dist",
+		// Client routes (/trades, /strategy, ...) deep-link: unknown paths get index.html.
+		"not_found_handling": "single-page-application",
+		"html_handling": "auto-trailing-slash"
+	}
+}
