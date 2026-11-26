@@ -544,13 +544,20 @@ others:
 4. Upload `chart/<SYMBOL>.json` for each enabled symbol, at most every 5
    minutes. Chart times are true UTC, not the local-time-shifted times the old
    page uses.
-5. Sync media. This uploads the final EN and zh recap videos, their covers and
-   `meta.json` to this private bucket (the zh cut is for the owner's private
-   dashboard only and is never published; the public site lists only the
-   English cut); per-scene `clip_*.mp4` files are never uploaded. It then writes
-   `media/history.json` with `/media/...?v=<content hash>` URLs (a re-render
-   with the same file names still gets new URLs, so no browser replays the old
-   video from its cache) and deletes recaps older than the retention window.
+5. Sync media. The cloud dashboard plays each recap from YouTube, so for an
+   edition whose English upload is public or unlisted this uploads only its
+   English cover and `meta.json`, and lists it in `media/history.json` with
+   its `youtube_id`. The English video goes up only as a fallback, for an
+   edition still without an embeddable id 3 hours after its render, and is
+   deleted again once an id appears. The Chinese (zh) cut stays on this box:
+   it is archived and plays on :8787, but no zh file or field is ever
+   uploaded, and per-scene `clip_*.mp4` files never are either. URLs carry a
+   content hash (`/media/...?v=<hash>`), so a re-render with the same file
+   names is still a new URL and no browser replays the old file from its
+   cache. Each sync then deletes whatever else is under `media/<date>/` for
+   the dates it keeps (zh files, replaced videos, editions gone from the
+   archive), and hourly it deletes recaps older than the retention window.
+   `docs/cloud-dashboard.md` (Recap videos) has the exact rules.
 
 An object whose content has not changed is not uploaded again. There are two
 exceptions. The snapshot is re-sent on every run, because its `as_of` time is
@@ -589,9 +596,10 @@ Other modes:
   section is kept between cycles, so each cycle asks Alpaca only for new
   orders (a cron run is a new process and reads the history once per run).
 - `--no-media` skips the archive.
-- `--retention-days N` keeps N days of recaps in the bucket (default 40, which
-  keeps R2 under 8 GB even with a recap every day; see `docs/cloud-dashboard.md`,
-  step 2, which also says how to set the bucket's lifecycle rule to match).
+- `--retention-days N` keeps N days of recaps in the bucket (default 40: about
+  0.15 GB with the recaps on YouTube, and under 4 GB even if every one fell
+  back to its video; see `docs/cloud-dashboard.md`, step 2, which also says
+  how to set the bucket's lifecycle rule to match).
 - `--force` re-sends everything.
 
 Exit status is 0 on success, or when another run already holds the lock. It
@@ -601,8 +609,9 @@ is 1 if a step failed and 2 if the configuration is missing.
 layout into a folder. It needs no boto3, no credentials and no network beyond
 what the builders already use. Approvals are read from `PATH/approvals/`, which
 is how the Worker's approve flow can be tried end to end. Media is off by
-default in this mode, because it would copy every recap video inside the
-retention window; add `--media` (and a small `--retention-days`) to include it.
+default in this mode, because it would copy the covers, and any fallback
+video, inside the retention window; add `--media` (and a small
+`--retention-days`) to include it.
 
 ```bash
 PYTHONPATH=. .venv/bin/python -m web.publisher --out-dir /tmp/r2-layout

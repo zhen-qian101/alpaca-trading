@@ -8,8 +8,8 @@ exposure of it.
 - **App:** `apps/dashboard/`, a Vite + React 19 + TypeScript SPA and one
   Cloudflare Worker (Static Assets on `*.workers.dev`). Pages: Terminal
   (account, positions and the options sleeve, rotation board, engine, signal
-  chart, executions, journal), Briefing (recap videos) and Look (the
-  presenter's outfit sign-off).
+  chart, executions, journal), Briefing (the English recap videos, played
+  from YouTube) and Look (the presenter's outfit sign-off).
 - **Publisher:** `web/publisher.py` on the home box pushes the data to an R2
   bucket every minute.
 - **Access:** Cloudflare Access protects the whole Worker. The Worker also
@@ -57,6 +57,9 @@ exposure of it.
 - `web/server.py` on 127.0.0.1:8787 keeps running unchanged. The recap
   renderer screenshots it for the DESK slide, so it cannot be switched off.
 - The trading engine, crons, broker keys, IBKR and the recap renderer.
+- The Chinese (zh) cut of every recap. It is still rendered, archived and
+  shown on the local :8787 page, but no zh video, cover, title or field is
+  ever uploaded to R2, to YouTube or to the cloud dashboard.
 - The publisher's state (`$ALPACA_DATA_DIR/publisher/state.json`): content
   hashes, which approvals were applied, and their outcomes.
 
@@ -71,9 +74,47 @@ epoch **seconds** in true UTC, ratios as fractions (0.0123 = 1.23%).
 | `snapshot/latest.json` | publisher, every run (every minute), changed or not: `as_of` is the heartbeat | `{"schema":1, "as_of", "publisher":{"version","host","approval"}, "portfolio", "board", "journal", "executions", "symbols", "look", "options"}`. Each section is its builder's output, or `{"error": "..."}` if that builder failed. `options` is the put sleeve (null when none is configured). `publisher.approval` is what the home box did with the newest approval request for the look's date. |
 | `chart/<KEY>.json` | publisher, at most every 5 min | `build_chart(symbol, 220)` in TRUE UTC epochs, wrapped as `{"schema":1, "as_of", "time_basis":"utc", "symbols":{...}}` (or `error`). `KEY` is the symbol with `/` replaced by `-` (`BTC/USD` is `chart/BTC-USD.json`). |
 | `look/<date>/plate.png`, `look/<date>/keyframe.png` | publisher, before the snapshot that points at them | The session date's wardrobe plate and stage keyframe. The snapshot's `look.plate_url` / `keyframe_url` end in `&v=<first 12 hex of the image's SHA-256>`, so a redraw for the same date is a new URL and the page fetches it. |
-| `media/history.json` | publisher | The recap index, URLs rewritten from `/archive/...` to `/media/...?v=<first 12 hex of the file's SHA-256>`, listing only editions whose files were uploaded. The version makes a re-rendered file (same name, new bytes) a new URL. |
-| `media/<date>/<slot>/<file>` | publisher | Final EN and zh recap MP4s, cover PNGs and `meta.json`. Per-scene `clip_*.mp4` files are never uploaded. Kept for 40 days (`--retention-days`; the storage budget is in step 2). |
+| `media/history.json` | publisher | The recap index (`briefing/generate.py`'s shape without any zh field, `desk` or `youtube` record). Each listed edition has `youtube_id` (its English upload is public or unlisted on YouTube) or `briefing` (the fallback MP4 in the bucket), never neither; `cover` is the English cover, the poster for either player. URLs are `/media/...?v=<first 12 hex of the file's SHA-256>`, so a re-rendered file (same name, new bytes) is a new URL. See [Recap videos](#recap-videos-youtube-first). |
+| `media/<date>/<slot>/<file>` | publisher | `meta.json` (zh fields, `desk` and the `youtube` records stripped), the English cover PNG, and the English MP4 only for an edition that did not reach YouTube. Never a zh file, never the per-scene `clip_*.mp4` files. Kept for 40 days (`--retention-days`; the storage budget is in step 2). |
 | `approvals/<date>.json` | Worker | `{"date", "approved", "requested_at", "requested_by"}`. Applied at home by the publisher. |
+
+### Recap videos: YouTube first
+
+The dashboard plays each recap from YouTube. The bucket holds a recap's
+English video only as a fallback for an edition that never got there.
+
+- **On YouTube.** `briefing/publish_youtube.py` records each upload in the
+  edition's `meta.json` as `youtube.en = {id, url, posted_at, privacy}`. When
+  the id is a well-formed 11-character YouTube id and `privacy` is `public` or
+  `unlisted`, history.json lists the edition with `youtube_id`, and only its
+  `meta.json` and English cover go up. A private video cannot be embedded for
+  a viewer, so it counts as no id.
+- **Fallback.** An edition without an embeddable id gets its English MP4
+  uploaded, and is listed with `briefing`, once 3 hours have passed since its
+  `generated_at` (`YOUTUBE_GRACE_SEC` in `web/publisher.py`). The upload runs
+  right after the render (8 to 14 minutes later on the real archive, frame
+  review included), so a fresh recap normally has its id long before that.
+  Until then the edition is not listed. There is no faster signal:
+  `publish_youtube` writes nothing to `meta.json` when its pre-upload frame
+  review refuses a video (it logs `[BLOCKED]` and moves on) or when the upload
+  fails (it exits with an error, and `run_briefing.sh` logs a `WARNING` line
+  and carries on); it only records a successful upload.
+- **Switching.** When an id appears later (a manual
+  `publish_youtube publish` retry), the edition switches to `youtube_id` and
+  the fallback MP4 is deleted from the bucket. If the video is made private
+  again, the MP4 goes back up.
+- **Reconciliation.** Each media sync makes `media/<date>/` hold exactly that
+  set for every date inside the retention window, and deletes everything else
+  there: zh videos and covers (including the `_zh_bili` cover), MP4s a
+  `youtube_id` has replaced, scene clips, and the files of an edition that is
+  gone from the archive. It deletes only after the history.json that no longer
+  points at those objects is in the bucket, and never touches
+  `media/history.json`, `snapshot/`, `chart/`, `look/` or `approvals/`. A slot
+  whose `meta.json` is still being written, or cannot be read, keeps its
+  English files; if the archive itself cannot be read (the disk is not
+  mounted), only zh objects are deleted. `--dry-run` prints a `DELETE` line
+  for each object it would remove, and the log gives counts, never keys.
+  Dates older than the window are pruned hourly, as before.
 
 ### Worker API
 
@@ -134,16 +175,18 @@ hostname or email; you enter those in the places below.
    1. **R2 Object Storage → Enable.** A payment card is required even though
       usage should stay in or near the free tier (10 GB-month of storage,
       1 M Class A and 10 M Class B operations a month). The publisher makes
-      roughly 150–200 k writes and lists a month. Storage stays inside the
-      free tier with the default 40 days of retention. Measured on the recap
-      archive over the 30 days to 2026-11-26: 22 editions. Each uploads
-      155 MB on average (EN + zh video, two covers, `meta.json`; per-scene
-      clips stay home) and at most 174 MB, which is 114 MB per calendar day.
-      Each date's look images add about 2.7 MB, and the snapshot, charts and
-      history together about 1 MB. Forty days (41 dated folders) is therefore
-      about 4.8 GB at the measured rate. Even with a 174 MB recap every single
-      day, plus one uploaded before the hourly prune, it is about 7.4 GB, under
-      an 8 GB budget.
+      roughly 200–250 k writes and lists a month (the snapshot, the approvals
+      listing and the media listing are about 43 k each). Storage stays far
+      inside the free tier with the default 40 days of retention. Measured on
+      the recap archive over the 41 dated folders to 2026-11-26: 29 editions.
+      A recap on YouTube uploads only its English cover (1.39 MB on average,
+      at most 1.89 MB) and its `meta.json` (about 2 KB), about 40 MB for the
+      window; each date's look images add about 2.7 MB, and the snapshot,
+      charts and history together about 1 MB, so about 0.15 GB in all. An
+      edition that falls back adds its English video (72.6 MB on average, at
+      most 86.2 MB). Even if every recap for six weeks fell back with the
+      largest video, 41 dated folders plus one uploaded before the hourly
+      prune is about 3.8 GB, under an 8 GB budget.
    2. **Create bucket** named exactly `alpaca-dashboard` (automatic location,
       Standard storage class).
    3. **Bucket → Settings → Object lifecycle rules → Add rule:** prefix
@@ -151,7 +194,8 @@ hostname or email; you enter those in the places below.
       earlier as `expire-media` with 60 days should be changed to 42.) The
       publisher deletes each date's recap 41 days after that date, so the rule
       only acts if the home box stops pruning. It then caps `media/` at about
-      42 days of uploads (at most about 7.6 GB). Keep the rule at least
+      42 days of uploads (about 4 GB even if every recap fell back to its
+      video). Keep the rule at least
       `--retention-days` + 2: a shorter one deletes recaps that `history.json`
       still lists. The publisher re-sends `media/history.json` at least once a
       day, so the rule never expires the index itself. Optionally, add the
@@ -188,8 +232,12 @@ hostname or email; you enter those in the places below.
 
    The bucket should now hold `snapshot/latest.json`, `chart/*.json` and
    `look/<date>/*.png`, and after the media step `media/...`. The first media
-   run uploads up to 40 days of recaps (about 5 GB) and can take a while. It runs under its
-   own lock, so the next minute's snapshot is not held up.
+   run uploads the covers and `meta.json` of up to 40 days of recaps (about
+   40 MB), plus the English video of any edition that never reached YouTube.
+   On a bucket an older publisher filled, it also deletes every zh file and
+   every English video a YouTube id has replaced; run it with `--dry-run`
+   first to see those as `DELETE` lines. Media runs under its own lock, so the
+   next minute's snapshot is not held up.
 
 4. **Zero Trust.** Open **Zero Trust** in the dashboard and choose a team
    name. Your team domain becomes `https://<team>.cloudflareaccess.com`. Pick
@@ -363,7 +411,10 @@ hostname or email; you enter those in the places below.
 | 401 "invalid Access token" while logged in | `ACCESS_AUD` does not match the application's AUD tag, or the application was re-created (a new AUD). Copy it again. |
 | The SPA says "Signed out — reload to sign in via Cloudflare Access" | The Access session expired; requests are redirected to the login page. Reload to sign in. |
 | Sign-off stays "waiting for the home box" | The publisher has not run since the request; it applies requests on its next cycle. If the page says **Not applied**, the home box refused it: `rejected` means a malformed request, or one that reached the home box after the date's 20:00 ET render had started; `superseded` means the look record was changed at home (on :8787, or redrawn) after the request. Before 20:00 ET, send it again if you still want it. After the render, the page no longer offers sign-off; if the video will be rendered again, sign off on the local dashboard. |
-| Video will not play or seek | Check `media/<date>/<slot>/` in the bucket. Only editions within the retention window are uploaded, and a file still being written (under 2 minutes old) waits for the next run. |
+| A new recap is missing from the Briefing page | It is waiting for its YouTube id. An edition without an embeddable one is listed only 3 hours after its render, from its uploaded English video. If the publish failed or the frame review blocked it (the render's log says so), publish it again at home with `python -m briefing.publish_youtube publish --date D --slot video` (after a frame-review block, fix the shots first, or pass `--skip-qc`); the page switches to YouTube on the next run. |
+| A YouTube recap will not play | The video must be public or unlisted, with embedding allowed (YouTube's default): a private one is never listed with `youtube_id` (after 3 hours it plays from the uploaded video instead). Change it with `python -m briefing.publish_youtube set-privacy --to unlisted --date D --slot video`. |
+| Fallback video will not play or seek | Check `media/<date>/<slot>/` in the bucket. Only editions within the retention window are uploaded, and a file still being written (under 2 minutes old) waits for the next run. |
+| No Chinese version on the cloud page | By design: the zh cut stays on the home box and plays on the local :8787 page only. |
 | A chart says "No chart has been published" | The symbol is enabled but its first build has not happened, or it has no cached bars at home. Charts are rebuilt at most every 5 minutes. |
 | The chart panel says no symbols are enabled, and the engine grid marks none "disabled — not polled" | The publisher could not read `sigengine/config.json` (missing, half-written or not JSON); `agent/publisher.log` says so. It then sends each engine symbol as `enabled: null` (unknown), and the grid shows every symbol's real lag rather than hiding it. Fix the file at home; the next run corrects both panels. |
 | The deploy job ran but did nothing | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing from the `production` environment (step 9); the run shows a "Deploy skipped" notice. Repository secrets of the same name are not what the job is meant to read: move them into the environment. |
