@@ -838,11 +838,84 @@
     overflow: hidden;
     border: 1px solid var(--rule);
   }
-  .video-frame video {
+  .video-frame video,
+  .video-frame iframe {
     display: block;
     width: 100%;
     aspect-ratio: 16 / 9;
     background: #000;
+    border: 0;
+  }
+
+  /* The click-to-play stand-in for a YouTube edition. The frame stays black in
+     both themes, like a video, so its colours are fixed rather than tokens. */
+  .facade {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    padding: 0;
+    border: 0;
+    background: #000;
+    color: #fff;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .facade:focus-visible {
+    /* inside the frame, whose overflow would clip an outer ring */
+    outline-offset: -4px;
+  }
+  .facade img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .facade__placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.25rem;
+    padding-top: 12%;
+    background: linear-gradient(160deg, #1d3341, #0b151b);
+    color: #c9d6de;
+    text-align: center;
+  }
+  .facade__play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    height: 4rem;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgb(255 255 255 / 0.9);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.6);
+    color: #fff;
+  }
+  .facade__play svg {
+    margin-left: 3px;
+  }
+  .facade:hover .facade__play,
+  .facade:focus-visible .facade__play {
+    border-color: #f5cb4c;
+    background: #f5cb4c;
+    color: #0e1a22;
+  }
+  .facade__note {
+    position: absolute;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    background: rgb(0 0 0 / 0.65);
+    font-size: 0.75rem;
   }
 
   .skeleton {

@@ -150,16 +150,18 @@ try {
     putJson(`chart/${name.slice('chart-'.length)}`, chart)
   }
 
-  // history + the media it points at (one sample video and cover reused)
+  // history + the media it points at (one sample video and cover reused).
+  // Like the real bucket: a YouTube edition's mp4 is NOT in R2 (it plays from
+  // YouTube); only a fallback edition's `briefing` is. Nothing zh exists.
   const history = readJson(join(FIX, 'history.json'))
+  if (/_zh|"zh"|[\u4e00-\u9fff]/.test(JSON.stringify(history))) {
+    throw new Error('fixtures/history.json carries zh: the Chinese cut never goes to the cloud')
+  }
   putJson('media/history.json', history)
-  const URL_KEYS = ['briefing', 'briefing_zh', 'cover', 'cover_zh', 'cover_zh_bili']
+  const URL_KEYS = ['briefing', 'cover']
   const uploaded = new Set()
   for (const ed of history.briefings) {
-    const urls = [
-      ...URL_KEYS.map((k) => ed[k]),
-      ...ed.clips.flatMap((c) => [c.file, c.file_zh]),
-    ].filter(Boolean)
+    const urls = [...URL_KEYS.map((k) => ed[k]), ...ed.clips.map((c) => c.file)].filter(Boolean)
     for (const url of urls) {
       // "/media/<date>/<slot>/<file>?v=<sha>": the key is the path, without the version
       const key = url.replace(/^\//, '').replace(/\?.*$/, '')
@@ -168,13 +170,11 @@ try {
       if (key.endsWith('.mp4')) put(key, join(FIX, 'media', 'sample.mp4'), 'video/mp4')
       else put(key, join(FIX, 'media', 'cover.png'), 'image/png')
     }
-    // meta.json = the archived meta: names only, no URLs
+    // meta.json = the archived meta: names only, no URLs, no YouTube id
+    // (history.json carries that; meta.json's raw `youtube` record is dropped)
     const meta = structuredClone(ed)
-    for (const k of [...URL_KEYS, 'local']) delete meta[k]
-    for (const c of meta.clips) {
-      delete c.file
-      delete c.file_zh
-    }
+    for (const k of [...URL_KEYS, 'youtube_id', 'local']) delete meta[k]
+    for (const c of meta.clips) delete c.file
     putJson(`media/${ed.date}/${ed.slot}/meta.json`, meta)
   }
   console.log('done')

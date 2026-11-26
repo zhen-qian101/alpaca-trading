@@ -20,7 +20,6 @@
         {
           "symbol": "OVERVIEW",
           "clip_file": "clip_OVERVIEW.mp4",
-          "clip_file_zh": "clip_OVERVIEW_zh.mp4",
           "duration_s": 34.2,
           "bias": null,
           "mood": "steady",
@@ -37,7 +36,6 @@
         {
           "symbol": "ACME",
           "clip_file": "clip_ACME.mp4",
-          "clip_file_zh": "clip_ACME_zh.mp4",
           "duration_s": 41.5,
           "bias": "long",
           "mood": "upbeat",
@@ -46,23 +44,12 @@
         {
           "symbol": "NOVA",
           "clip_file": "clip_NOVA.mp4",
-          "clip_file_zh": "clip_NOVA_zh.mp4",
           "duration_s": 37.0,
           "bias": "flat",
           "mood": "patient",
           "headline": "Waiting on 57.50"
         }
       ],
-      "briefing_file_zh": "post-market-recap_2026-03-04_zh.mp4",
-      "voice_zh": "zh-CN-DemoNeural",
-      "title_zh": "半导体独撑大盘",
-      "title_zh_check": {
-        "model": "demo-check-model",
-        "checked": true,
-        "ok": true,
-        "errors": [],
-        "rewritten": false
-      },
       "cover_head": {
         "title": "Semis carry a narrow tape higher",
         "keywords": [
@@ -72,13 +59,10 @@
         "art": "a paper boat riding a rising tide"
       },
       "cover_file": "post-market-recap_2026-03-04_cover.png",
-      "cover_file_zh": "post-market-recap_2026-03-04_cover_zh.png",
       "kind": "video",
       "slot": "video",
-      "briefing": "/media/2026-03-04/video/post-market-recap_2026-03-04.mp4?v=ddcdc1b7b20e",
-      "briefing_zh": "/media/2026-03-04/video/post-market-recap_2026-03-04_zh.mp4?v=ddcdc1b7b20e",
       "cover": "/media/2026-03-04/video/post-market-recap_2026-03-04_cover.png?v=5fcaeb34b00d",
-      "cover_zh": "/media/2026-03-04/video/post-market-recap_2026-03-04_cover_zh.png?v=5fcaeb34b00d",
+      "youtube_id": "FAKEyt00001",
       "local": false
     },
     {
@@ -147,8 +131,7 @@
           "start_s": 0.0,
           "duration_s": 48.0,
           "bias": null,
-          "headline": "The tortoise counts its gains.",
-          "file": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e"
+          "headline": "The tortoise counts its gains."
         },
         {
           "symbol": "The Hare",
@@ -156,24 +139,12 @@
           "start_s": 48.0,
           "duration_s": 52.5,
           "bias": null,
-          "headline": "The hare sprints and stumbles.",
-          "file": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e"
+          "headline": "The hare sprints and stumbles."
         }
       ],
-      "briefing_file_zh": "weekend-recap_2026-03-01_zh.mp4",
-      "voice_zh": "zh-CN-DemoNeural",
-      "title_zh": "龟兔赛跑：市场版",
-      "title_zh_check": {
-        "model": "demo-check-model",
-        "checked": true,
-        "ok": true,
-        "errors": [],
-        "rewritten": false
-      },
       "kind": "video",
       "slot": "video",
-      "briefing": "/media/2026-03-01/video/weekend-recap_2026-03-01.mp4?v=ddcdc1b7b20e",
-      "briefing_zh": "/media/2026-03-01/video/weekend-recap_2026-03-01_zh.mp4?v=ddcdc1b7b20e",
+      "youtube_id": "FAKEyt00002",
       "local": false
     }
   ]

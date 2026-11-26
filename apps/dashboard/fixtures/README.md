@@ -14,10 +14,10 @@ to the contract types once.
 | `chart-ACME.json` | `chart/ACME.json` | 220 hourly bars, BB + RSI + MACD, signal arrows, an account exit, a fill. |
 | `chart-NOVA.json` | `chart/NOVA.json` | 160 bars, MACD only: Bollinger/RSI series are empty and `bbLabel` is `""`. |
 | `chart-QBIT-USD.json` | `chart/QBIT-USD.json` | Crypto, 24/7 bars, keyed `QBIT/USD` inside the file. |
-| `history.json` | `media/history.json` | Three editions: an EN + zh recap with covers, an EN-only slideshow, and a legacy story render whose clips are chapters (`file` + `start_s`) of the full video. Every URL ends in `?v=` + the first 12 hex of the SHA-256 of the sample file `pnpm seed:local` uploads for it. |
+| `history.json` | `media/history.json` | Three editions, English only (the Chinese cut never reaches the cloud): a recap on YouTube (`youtube_id` `FAKEyt00001`, a cover, no mp4 in R2), a slideshow that did not reach YouTube and plays its **fallback** mp4 (`briefing` + cover), and a legacy story render on YouTube (`FAKEyt00002`) with no cover, whose chapters carry recorded `start_s`. The YouTube ids are fake: nothing here may name a real video. Every URL ends in `?v=` + the first 12 hex of the SHA-256 of the sample file `pnpm seed:local` uploads for it. |
 | `approval-request.json` | `approvals/<date>.json` | A pending sign-off request. |
 | `look/plate.png`, `look/keyframe.png` | `look/<date>/{plate,keyframe}.png` | Test patterns. |
-| `media/sample.mp4`, `media/cover.png` | every mp4 / cover in `history.json` | One 2-second test-pattern video and one cover, reused for all editions. |
+| `media/sample.mp4`, `media/cover.png` | the fallback mp4 and every cover in `history.json` | One 2-second test-pattern video and one cover, reused for all editions. |
 
 `ORBT` is in `snapshot.symbols` but has **no** chart fixture on purpose: it
 exercises the "chart not published yet" state.

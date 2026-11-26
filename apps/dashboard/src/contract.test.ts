@@ -10,6 +10,8 @@ import {
   R2_KEYS,
   SNAPSHOT_SCHEMA,
   SYMBOL_RE,
+  YOUTUBE_GRACE_SEC,
+  YOUTUBE_ID_RE,
   type Board,
   type Executions,
   type Journal,
@@ -211,15 +213,16 @@ describe('history fixture', () => {
     expect(JSON.stringify(h)).not.toContain('/archive/')
     for (const ed of h.briefings) {
       const base = `/media/${ed.date}/${ed.slot}/`
-      const urls = [ed.briefing, ed.briefing_zh, ed.cover, ed.cover_zh, ed.cover_zh_bili]
-        .concat(ed.clips.flatMap((c) => [c.file, c.file_zh]))
+      const urls = [ed.briefing, ed.cover]
+        .concat(ed.clips.map((c) => c.file))
         .filter((u): u is NonNullable<typeof u> => u !== undefined)
       for (const url of urls) {
         expect(url.startsWith(base), url).toBe(true)
         // every media URL carries its content version (web/publisher.py media_url)
         expect(url, url).toMatch(/^\/media\/[^?]+\?v=[0-9a-f]{12}$/)
       }
-      expect(ed.briefing.split('?')[0]).toBe(base + ed.briefing_file)
+      if (ed.briefing !== undefined) expect(ed.briefing.split('?')[0]).toBe(base + ed.briefing_file)
+      if (ed.cover !== undefined) expect(ed.cover.split('?')[0]).toBe(base + ed.cover_file)
       expect(ed.kind).toBe(ed.slot.startsWith('slideshow') ? 'slideshow' : 'video')
       expect(ed.local).toBe(false)
       for (const c of ed.clips) {
@@ -232,8 +235,49 @@ describe('history fixture', () => {
     }
   })
 
+  it('plays every edition from YouTube or the fallback mp4, never both, never neither', () => {
+    for (const ed of h.briefings) {
+      const id = `${ed.date}/${ed.slot}`
+      expect(ed.youtube_id !== undefined || ed.briefing !== undefined, id).toBe(true)
+      expect(ed.youtube_id !== undefined && ed.briefing !== undefined, id).toBe(false)
+      if (ed.youtube_id !== undefined) expect(ed.youtube_id, id).toMatch(YOUTUBE_ID_RE)
+    }
+    // The fixture covers both players.
+    expect(h.briefings.some((ed) => ed.youtube_id !== undefined)).toBe(true)
+    expect(h.briefings.some((ed) => ed.briefing !== undefined)).toBe(true)
+  })
+
+  it('carries nothing Chinese and none of the dropped records', () => {
+    const keys = new Set<string>()
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk)
+      else if (v && typeof v === 'object')
+        for (const [k, child] of Object.entries(v)) {
+          keys.add(k)
+          walk(child)
+        }
+    }
+    walk(h)
+    for (const k of keys) expect(k, k).not.toMatch(/zh/i)
+    expect(keys.has('youtube')).toBe(false)
+    expect(keys.has('desk')).toBe(false)
+    expect(JSON.stringify(h)).not.toMatch(/_zh[._]|[\u4e00-\u9fff]/)
+  })
+
   it('is newest first', () => {
     const keys = h.briefings.map((b) => `${b.date} ${b.generated_at}`)
     expect([...keys].sort().reverse()).toEqual(keys)
+  })
+})
+
+describe('YouTube contract', () => {
+  it('accepts exactly 11 id characters', () => {
+    for (const ok of ['FAKEyt00001', 'abc_DEF-123', 'Zz9-_aA0bB1']) expect(ok).toMatch(YOUTUBE_ID_RE)
+    for (const bad of ['', 'FAKEyt0000', 'FAKEyt000011', 'FAKEyt0000/', 'FAKEyt0000?', 'FAKE yt0001', 'FAKEyt0000\n'])
+      expect(bad).not.toMatch(YOUTUBE_ID_RE)
+  })
+
+  it('gives a fresh edition three hours to reach YouTube', () => {
+    expect(YOUTUBE_GRACE_SEC).toBe(10_800)
   })
 })

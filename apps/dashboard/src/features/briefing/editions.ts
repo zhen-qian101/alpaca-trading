@@ -1,31 +1,37 @@
 import type { Edition, EditionClip, MediaUrl } from '../../contract.ts'
-
-export type Lang = 'en' | 'zh'
+import { isYoutubeId } from '../../lib/youtube.ts'
 
 /** Stable id of an edition: its archive directory, "<date>/<slot>". */
 export function editionId(e: Edition): string {
   return `${e.date}/${e.slot}`
 }
 
-export function hasZh(e: Edition): boolean {
-  return typeof e.briefing_zh === 'string' && e.briefing_zh.length > 0
+/** How an edition plays: the YouTube embed, or the fallback mp4 from R2. */
+export type Playback = { kind: 'youtube'; id: string } | { kind: 'file'; src: MediaUrl }
+
+function isMediaUrl(value: unknown): value is MediaUrl {
+  return typeof value === 'string' && value.startsWith('/media/')
 }
 
-/** The language actually playable: zh only when the edition has a zh cut. */
-export function effectiveLang(e: Edition, wanted: Lang): Lang {
-  return wanted === 'zh' && hasZh(e) ? 'zh' : 'en'
+/**
+ * The edition's player, or null when it has nothing playable. YouTube wins
+ * when both are present: the publisher replaces the fallback mp4 with the id
+ * once one appears, and the mp4 is on its way out of R2.
+ */
+export function playbackFor(e: Edition): Playback | null {
+  if (isYoutubeId(e.youtube_id)) return { kind: 'youtube', id: e.youtube_id }
+  if (isMediaUrl(e.briefing)) return { kind: 'file', src: e.briefing }
+  return null
 }
 
-export function videoSrc(e: Edition, lang: Lang): MediaUrl {
-  return lang === 'zh' && e.briefing_zh ? e.briefing_zh : e.briefing
-}
-
-export function posterSrc(e: Edition, lang: Lang): MediaUrl | undefined {
-  return lang === 'zh' ? (e.cover_zh ?? e.cover) : e.cover
-}
-
-export function titleFor(e: Edition, lang: Lang): string | null {
-  return lang === 'zh' && e.title_zh ? e.title_zh : e.title
+/**
+ * The editions the page can offer. history.json should never list one with
+ * neither a YouTube id nor a fallback mp4, nor a malformed id (which is never
+ * put into an embed URL); if it does, the entry is left out rather than shown
+ * as a player that cannot play.
+ */
+export function playableEditions(editions: readonly Edition[]): Edition[] {
+  return editions.filter((e) => playbackFor(e) !== null)
 }
 
 /** Editions grouped by session date, newest first, keeping history.json's order. */
@@ -45,7 +51,7 @@ export interface Chapter {
   label: string
   headline: string
   bias: EditionClip['bias']
-  /** Seconds into the playing video. */
+  /** Seconds into the full EN video. */
   start: number
   /**
    * True when the archive recorded this offset (legacy story renders). False
@@ -56,21 +62,21 @@ export interface Chapter {
 }
 
 /**
- * The running order as seek points into the video that is playing.
+ * The running order as seek points into the full EN video, whichever player
+ * shows it (YouTube serves the same EN cut as the fallback mp4).
  *
- * Legacy story renders record each chapter's offset (`start_s`) into the full
- * EN video. Everything else is a plain concat of its scenes, so a scene starts
- * where the previous ones' running times add up to; that sum is scaled to the
- * real length of the video once it is known (the zh cut runs to its own
- * timings, and the final encode can pad a scene by a frame or two).
+ * Legacy story renders record each chapter's offset (`start_s`). Everything
+ * else is a plain concat of its scenes, so a scene starts where the previous
+ * ones' running times add up to; that sum is scaled to the real length of the
+ * video once a <video> knows it (`videoDuration`), else to the archived
+ * `duration_s` (the final encode can pad a scene by a frame or two).
  */
-export function chaptersFor(e: Edition, lang: Lang, videoDuration: number | null): Chapter[] {
+export function chaptersFor(e: Edition, videoDuration: number | null): Chapter[] {
   const clips = e.clips ?? []
   if (clips.length === 0) return []
-  const src = videoSrc(e, lang)
   const recorded = clips.every((c) => typeof c.start_s === 'number')
 
-  if (recorded && lang === 'en' && clips.every((c) => c.file === undefined || c.file === src)) {
+  if (recorded && clips.every((c) => c.file === undefined || c.file === e.briefing)) {
     return clips.map((c, i) => ({
       key: `${i}-${c.symbol}`,
       label: c.symbol,

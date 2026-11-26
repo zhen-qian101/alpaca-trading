@@ -10,8 +10,16 @@ properties locked in below are:
     heartbeat and goes up every run, after the images it points at;
   * an approval is applied once, a malformed one never, and none once its
     date's 20:00 ET render has started;
-  * only final recap videos, covers and meta.json leave the box, within the
-    retention window, and history.json never points at a missing object;
+  * only English covers, zh-stripped meta.json and (as the fallback for an
+    edition that did not reach YouTube) English videos leave the box, within
+    the retention window; nothing of the zh cut ever does; history.json lists
+    an edition by its embeddable youtube_id or its uploaded video, and never
+    points at a missing object;
+  * each media sync deletes what the bucket should no longer hold inside the
+    window (zh files, videos a youtube_id replaced), only after history.json
+    stopped pointing at it, never anything outside media/<date>/, and never
+    the EN objects of an edition it could not read, nor of many editions that
+    vanished from the archive at once (an unmounted disk, a wrong path);
   * overlapping cron runs exit at once;
   * the publisher cannot reach the order path, and needs no boto3 for --out-dir.
 
@@ -31,11 +39,12 @@ import math
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -49,6 +58,15 @@ from web.r2 import (ConfigError, DestinationError, DirDestination, R2Config, R2D
 ROOT = Path(__file__).resolve().parent.parent
 PNG = b"\x89PNG\r\n\x1a\n" + bytes(range(32))
 JPEG = b"\xff\xd8\xff\xe0" + bytes(32)
+# Invented, well-formed 11-character YouTube ids.
+YT_ID = "Syn7h3t1c-A"
+YT_ID2 = "Syn7h3t1c_B"
+
+
+def yt_record(vid: str = YT_ID, privacy: str = "public", **extra) -> dict:
+    """meta.json's `youtube` as briefing/publish_youtube.py records an EN upload."""
+    return {"en": {"id": vid, "url": f"https://youtu.be/{vid}",
+                   "posted_at": "2026-03-04T21:12:00+00:00", "privacy": privacy, **extra}}
 
 
 # --------------------------------------------------------------------------
@@ -254,27 +272,39 @@ class World:
         return (self.today + timedelta(days=offset)).isoformat()
 
     def edition(self, date: str, slot: str = "video", *, zh=True, covers=True, legacy=False,
-                meta_extra: dict | None = None, skip_files: tuple = (), age: float = 3600.0):
+                meta_extra: dict | None = None, skip_files: tuple = (), age: float = 3600.0,
+                youtube: dict | None = None, generated_at: str | None = None):
+        """An archived edition. By default its YouTube record is not
+        embeddable (a malformed id) and it was generated at 21:00 UTC on
+        `date`, so an edition dated yesterday or earlier is past the grace
+        period: a FALLBACK that uploads its EN mp4. `youtube` replaces the
+        record (yt_public(...) for an edition on YouTube)."""
         d = self.archive / date / slot
         d.mkdir(parents=True)
         label = "midday-briefing" if slot.startswith("slideshow") else "post-market-recap"
         stem = f"{label}_{date}"
-        meta = {"date": date, "generated_at": f"{date}T21:00:00+00:00",
+        meta = {"date": date, "generated_at": generated_at or f"{date}T21:00:00+00:00",
                 "briefing_file": f"{stem}.mp4", "duration_s": 60.0, "mode": "factual",
                 "label": label, "renderer": None, "title": f"Synthetic {date}", "model": None,
                 "images": False, "subtitles": True, "director": None, "voice": "en-US-DemoNeural",
-                "desk": {"equity": 12345.0}, "youtube": {"en": {"id": "demo"}},
+                "desk": {"equity": 12345.0},
+                "youtube": youtube if youtube is not None else {"en": {"id": "demo"}},
                 "kind": "video", "slot": slot, "clips": []}
         files = {meta["briefing_file"]: b"EN-" + date.encode()}
         if zh:
             meta["briefing_file_zh"] = f"{stem}_zh.mp4"
             files[meta["briefing_file_zh"]] = b"ZH-" + date.encode()
+            meta.update({"voice_zh": "zh-CN-DemoNeural", "title_zh": "合成标题",
+                         "title_zh_check": {"model": "demo", "checked": True, "ok": True,
+                                            "errors": ["错误"], "rewritten": False}})
         if covers:
             meta["cover_file"] = f"{stem}_cover.png"
             files[meta["cover_file"]] = PNG + b"en"
             if zh:
                 meta["cover_file_zh"] = f"{stem}_cover_zh.png"
                 files[meta["cover_file_zh"]] = PNG + b"zh"
+                meta["cover_file_zh_bili"] = f"{stem}_cover_zh_bili.png"
+                files[meta["cover_file_zh_bili"]] = PNG + b"bili"
         if legacy:
             meta["mode"] = "story"
             meta["clips"] = [
@@ -354,8 +384,8 @@ def _tree(root: Path) -> set[str]:
 
 
 def test_out_dir_mode_writes_the_exact_bucket_layout(world, tmp_path):
-    world.edition(world.day(-1), "video")
-    world.edition(world.day(-1), "slideshow-midday-briefing", zh=False)
+    world.edition(world.day(-1), "video", youtube=yt_record())            # on YouTube
+    world.edition(world.day(-1), "slideshow-midday-briefing", zh=False)   # the EN mp4 fallback
     out = tmp_path / "bucket"
     approval = out / "approvals" / f"{world.session}.json"
     approval.parent.mkdir(parents=True)
@@ -373,8 +403,7 @@ def test_out_dir_mode_writes_the_exact_bucket_layout(world, tmp_path):
         f"look/{world.session}/plate.png", f"look/{world.session}/keyframe.png",
         f"approvals/{world.session}.json",
         "media/history.json",
-        f"media/{d}/video/meta.json", f"media/{d}/video/{rec}.mp4", f"media/{d}/video/{rec}_zh.mp4",
-        f"media/{d}/video/{rec}_cover.png", f"media/{d}/video/{rec}_cover_zh.png",
+        f"media/{d}/video/meta.json", f"media/{d}/video/{rec}_cover.png",
         f"media/{d}/slideshow-midday-briefing/meta.json",
         f"media/{d}/slideshow-midday-briefing/{mid}.mp4",
         f"media/{d}/slideshow-midday-briefing/{mid}_cover.png",
@@ -388,6 +417,13 @@ def test_out_dir_mode_writes_the_exact_bucket_layout(world, tmp_path):
     chart = json.loads((out / "chart/QBIT-USD.json").read_text())
     assert list(chart["symbols"]) == ["QBIT/USD"] and chart["time_basis"] == "utc"
     assert (out / f"look/{world.session}/plate.png").read_bytes() == PNG
+    hist = json.loads((out / "media/history.json").read_text())
+    by_slot = {e["slot"]: e for e in hist["briefings"]}
+    assert by_slot["video"]["youtube_id"] == YT_ID and "briefing" not in by_slot["video"]
+    assert by_slot["video"]["cover"].startswith(f"/media/{d}/video/{rec}_cover.png?v=")
+    slide = by_slot["slideshow-midday-briefing"]
+    assert slide["briefing"].startswith(f"/media/{d}/slideshow-midday-briefing/{mid}.mp4?v=")
+    assert "youtube_id" not in slide
 
 
 def test_out_dir_mode_needs_no_boto3(world, tmp_path, monkeypatch):
@@ -1102,14 +1138,30 @@ def test_dry_run_without_r2_config_still_reports(world, monkeypatch, capsys):
 # --------------------------------------------------------------------------
 # media
 # --------------------------------------------------------------------------
-def test_media_uploads_only_final_videos_covers_and_meta(world, make_pub, s3):
-    d1, d2, d3 = world.day(-1), world.day(-2), world.day(-3)
-    world.edition(d1, "video")
+_CJK_RE = re.compile(r"[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]")
+
+
+def assert_zh_free(obj, where="") -> None:
+    """No zh field at any depth, no zh file name and no Chinese text."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            assert not re.search(r"(?:^|[._-])zh(?:[._-]|$)", k), f"{where}.{k}"
+            assert_zh_free(v, f"{where}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            assert_zh_free(v, f"{where}[{i}]")
+    elif isinstance(obj, str):
+        assert "_zh" not in obj and not _CJK_RE.search(obj), f"{where}: {obj!r}"
+
+
+def test_media_uploads_only_english_covers_meta_and_fallback_videos(world, make_pub, s3):
+    d1, d2, d3, d5 = world.day(-1), world.day(-2), world.day(-3), world.day(-5)
+    world.edition(d1, "video", youtube=yt_record())                 # on YouTube
     world.edition(d2, "slideshow-midday-briefing", zh=False, covers=False)
     world.edition(d3, "video", legacy=True)
     world.edition(world.day(-60), "video")                       # past retention
     world.edition(world.day(-4), "video", skip_files=(f"post-market-recap_{world.day(-4)}.mp4",))
-    world.edition(world.day(-5), "video", meta_extra={"cover_file": "../../../etc/passwd"})
+    world.edition(d5, "video", meta_extra={"cover_file": "../../../etc/passwd"})
     (world.archive / "_special_x" / "video").mkdir(parents=True)  # undated: never published
     (world.archive / world.day(-6) / "Bad Slot").mkdir(parents=True)
 
@@ -1117,50 +1169,48 @@ def test_media_uploads_only_final_videos_covers_and_meta(world, make_pub, s3):
 
     rec = lambda d, f: f"media/{d}/video/post-market-recap_{d}{f}"   # noqa: E731
     expected = {
-        rec(d1, ".mp4"), rec(d1, "_zh.mp4"), rec(d1, "_cover.png"), rec(d1, "_cover_zh.png"),
-        f"media/{d1}/video/meta.json",
+        rec(d1, "_cover.png"), f"media/{d1}/video/meta.json",      # the video plays from YouTube
         f"media/{d2}/slideshow-midday-briefing/midday-briefing_{d2}.mp4",
         f"media/{d2}/slideshow-midday-briefing/meta.json",
-        rec(d3, ".mp4"), rec(d3, "_zh.mp4"), rec(d3, "_cover.png"), rec(d3, "_cover_zh.png"),
-        f"media/{d3}/video/meta.json",
-        rec(world.day(-5), ".mp4"), rec(world.day(-5), "_zh.mp4"),
-        rec(world.day(-5), "_cover_zh.png"), f"media/{world.day(-5)}/video/meta.json",
+        rec(d3, ".mp4"), rec(d3, "_cover.png"), f"media/{d3}/video/meta.json",
+        rec(d5, ".mp4"), f"media/{d5}/video/meta.json",
         "media/history.json",
     }
     assert set(s3.objects) == expected
-    assert not [k for k in s3.objects if "clip_" in k]
+    assert not [k for k in s3.objects if "clip_" in k or "_zh" in k]
     uploads = [c for c in s3.calls if c[0] == "upload_file"]
     assert uploads and all(c[2]["ContentType"] in ("video/mp4", "image/png") for c in uploads)
     assert {c[2]["ContentType"] for c in uploads if c[1].endswith(".mp4")} == {"video/mp4"}
 
     meta = s3.json(f"media/{d1}/video/meta.json")
-    assert "desk" not in meta and "youtube" not in meta
+    assert "desk" not in meta and "youtube" not in meta and "youtube_id" not in meta
     assert "briefing" not in meta and all("file" not in c for c in meta["clips"])
+    assert meta["title"] == f"Synthetic {d1}" and meta["cover_file"].endswith("_cover.png")
+    for key in s3.objects:
+        if key.endswith(".json"):
+            assert_zh_free(s3.json(key), key)
 
     hist = s3.json("media/history.json")
     assert hist["current"] == d1
     assert [(e["date"], e["slot"]) for e in hist["briefings"]] == [
-        (d1, "video"), (d2, "slideshow-midday-briefing"), (d3, "video"),
-        (world.day(-5), "video")]
+        (d1, "video"), (d2, "slideshow-midday-briefing"), (d3, "video"), (d5, "video")]
     top = hist["briefings"][0]
     v = lambda key: hashlib.sha256(s3.objects[key]["body"]).hexdigest()[:12]   # noqa: E731
-    for field_, suffix in (("briefing", ".mp4"), ("briefing_zh", "_zh.mp4"),
-                           ("cover", "_cover.png"), ("cover_zh", "_cover_zh.png")):
-        key = rec(d1, suffix)
-        assert top[field_] == f"/{key}?v={v(key)}"
+    assert top["youtube_id"] == YT_ID and "briefing" not in top
+    assert top["cover"] == f"/{rec(d1, '_cover.png')}?v={v(rec(d1, '_cover.png'))}"
     assert top["local"] is False and top["kind"] == "video"
     assert "desk" not in top and "youtube" not in top
-    assert all("file" not in c and "file_zh" not in c for c in top["clips"])   # scene clips stay home
+    assert all("file" not in c for c in top["clips"])   # scene clips stay home
     slide = hist["briefings"][1]
-    assert slide["kind"] == "slideshow" and "briefing_zh" not in slide and "cover" not in slide
+    assert slide["kind"] == "slideshow" and "cover" not in slide and "youtube_id" not in slide
     legacy = hist["briefings"][2]
+    assert legacy["briefing"] == f"/{rec(d3, '.mp4')}?v={v(rec(d3, '.mp4'))}"
     assert [c["file"] for c in legacy["clips"]] == [legacy["briefing"]] * 2
-    assert legacy["clips"][0]["file_zh"] == legacy["briefing_zh"]
     assert legacy["clips"][1]["start_s"] == 30.0
     unsafe = hist["briefings"][3]
-    assert "cover" not in unsafe and unsafe["cover_zh"].split("?")[0].endswith("_cover_zh.png")
+    assert "cover" not in unsafe and unsafe["briefing"].split("?")[0] == f"/{rec(d5, '.mp4')}"
     for e in hist["briefings"]:      # every URL is an uploaded object, at that object's version
-        for k in ("briefing", "briefing_zh", "cover", "cover_zh", "cover_zh_bili"):
+        for k in ("briefing", "cover"):
             if k in e:
                 path, _, query = e[k].partition("?")
                 assert path.startswith("/media/") and path[1:] in s3.objects
@@ -1180,19 +1230,23 @@ def test_a_re_rendered_edition_gets_new_media_urls(world, make_pub, s3, clock):
 
     clock.t += 3600
     (slot_dir / meta["briefing_file"]).write_bytes(b"EN re-rendered")
-    (slot_dir / meta["cover_file"]).write_bytes(PNG + b"new cover")
     stamp = clock.t - 600                         # settled, and newer than the first run
-    for name in (meta["briefing_file"], meta["cover_file"]):
-        os.utime(slot_dir / name, (stamp, stamp))
+    os.utime(slot_dir / meta["briefing_file"], (stamp, stamp))
     assert pub.media_cycle()
     after = s3.json("media/history.json")["briefings"][0]
-
-    assert after["briefing"] != before["briefing"] and after["cover"] != before["cover"]
+    assert after["briefing"] != before["briefing"]
     assert after["briefing"].split("?")[0] == before["briefing"].split("?")[0]
     assert after["briefing"].endswith(
         "?v=" + hashlib.sha256(b"EN re-rendered").hexdigest()[:12])
-    assert after["briefing_zh"] == before["briefing_zh"]        # untouched file, same URL
-    assert after["cover_zh"] == before["cover_zh"]
+    assert after["cover"] == before["cover"]      # untouched file, same URL
+
+    clock.t += 3600
+    (slot_dir / meta["cover_file"]).write_bytes(PNG + b"new cover")
+    os.utime(slot_dir / meta["cover_file"], (clock.t - 600, clock.t - 600))
+    assert pub.media_cycle()
+    last = s3.json("media/history.json")["briefings"][0]
+    assert last["cover"] != after["cover"] and last["briefing"] == after["briefing"]
+    assert last["cover"].endswith("?v=" + hashlib.sha256(PNG + b"new cover").hexdigest()[:12])
 
 
 def test_media_url_versions_only_a_real_sha256():
@@ -1256,32 +1310,40 @@ def test_a_failed_upload_leaves_no_dangling_url(world, make_pub, s3, clock):
     d1, d2 = world.day(-1), world.day(-2)
     world.edition(d1)
     world.edition(d2)
+    world.edition(world.day(-3), youtube=yt_record())
     s3.fail_keys = {f"media/{d1}/video/post-market-recap_{d1}.mp4",
-                    f"media/{d2}/video/post-market-recap_{d2}_zh.mp4"}
+                    f"media/{d2}/video/post-market-recap_{d2}_cover.png",
+                    f"media/{world.day(-3)}/video/post-market-recap_{world.day(-3)}_cover.png"}
     assert make_pub().media_cycle() is False
     hist = s3.json("media/history.json")
-    assert [e["date"] for e in hist["briefings"]] == [d2]          # d1 has no EN video
-    assert "briefing_zh" not in hist["briefings"][0]
+    # d1 has no EN video (its fallback failed); the others are listed without
+    # the cover that failed, and the YouTube edition still plays
+    assert [e["date"] for e in hist["briefings"]] == [d2, world.day(-3)]
+    assert all("cover" not in e for e in hist["briefings"])
+    assert hist["briefings"][1]["youtube_id"] == YT_ID
 
     s3.fail_keys = set()
     clock.t += 60
     assert make_pub().media_cycle() is True
     hist = s3.json("media/history.json")
-    assert [e["date"] for e in hist["briefings"]] == [d1, d2]
-    assert "briefing_zh" in hist["briefings"][1]
+    assert [e["date"] for e in hist["briefings"]] == [d1, d2, world.day(-3)]
+    assert all("cover" in e for e in hist["briefings"])
 
 
 def test_retention_deletes_only_old_dated_media_and_looks(world, make_pub, s3, clock):
     days = pubmod.DEFAULT_RETENTION_DAYS
     old, keep = world.day(-days - 1), world.day(-days)
+    world.edition(keep, youtube=yt_record())             # the oldest date still kept
     for key in (f"media/{old}/video/a.mp4", f"media/{old}/video/meta.json",
-                f"look/{old}/plate.png", f"media/{keep}/video/b.mp4", f"look/{keep}/plate.png",
+                f"look/{old}/plate.png", f"look/{keep}/plate.png",
                 "media/history.json", f"approvals/{old}.json", "chart/ACME.json",
                 "snapshot/latest.json"):
         s3.objects[key] = {"body": b"x"}
     pub = make_pub()
     pub.media_cycle()
-    assert set(s3.objects) == {f"media/{keep}/video/b.mp4", f"look/{keep}/plate.png",
+    assert set(s3.objects) == {f"media/{keep}/video/meta.json",
+                               f"media/{keep}/video/post-market-recap_{keep}_cover.png",
+                               f"look/{keep}/plate.png",
                                "media/history.json", f"approvals/{old}.json",
                                "chart/ACME.json", "snapshot/latest.json"}
 
@@ -1296,12 +1358,18 @@ def test_retention_deletes_only_old_dated_media_and_looks(world, make_pub, s3, c
 
 
 def test_default_retention_fits_the_storage_budget():
-    """EXTRA B: 40 days of the measured worst edition (174 MB, every calendar
-    day, one more before the prune) plus look images stays under 8 GB."""
+    """EXTRA B: 40 days of the measured worst FALLBACK edition (EN mp4
+    86.2 MB + EN cover 1.9 MB + meta.json, as if YouTube were down for six
+    weeks), every calendar day, one more before the prune, plus look images,
+    stays under 8 GB. So would the old 174 MB EN + zh edition. With every
+    edition on YouTube (cover + meta.json only) it is a few hundred MB."""
     assert pubmod.DEFAULT_RETENTION_DAYS == 40
     assert pubmod.parse_args([]).retention_days == pubmod.DEFAULT_RETENTION_DAYS
-    worst_gb = (pubmod.DEFAULT_RETENTION_DAYS + 1) * (0.174 + 0.0027) + 0.174 + 0.002
-    assert worst_gb <= 8.0
+    folders = pubmod.DEFAULT_RETENTION_DAYS + 1
+    fallback = 0.0862 + 0.0019 + 0.00001
+    assert folders * (fallback + 0.0027) + fallback + 0.002 <= 4.0
+    assert folders * (0.174 + 0.0027) + 0.174 + 0.002 <= 8.0
+    assert folders * (0.0019 + 0.00001 + 0.0027) + 0.002 <= 0.25
 
 
 def test_history_is_resent_daily_so_the_lifecycle_rule_never_expires_it(world, make_pub, s3,
@@ -1323,6 +1391,441 @@ def test_retention_days_flag_limits_what_is_uploaded(world, make_pub, s3):
     world.edition(world.day(-3))
     make_pub(retention_days=2).media_cycle()
     assert [e["date"] for e in s3.json("media/history.json")["briefings"]] == [world.day(-1)]
+
+
+# --------------------------------------------------------------------------
+# media: YouTube first, the zh cut stays home, the bucket converges
+# --------------------------------------------------------------------------
+def _dest_state(world) -> dict:
+    data = json.loads((world.state_dir / "state.json").read_text())
+    (dest,) = data["destinations"].values()
+    return dest
+
+
+def _record_upload(world, slot_dir: Path, youtube: dict) -> None:
+    """Rewrite meta.json the way briefing/publish_youtube.py records an
+    upload (or set-privacy a change), settled by the time the next run looks."""
+    mp = slot_dir / "meta.json"
+    meta = json.loads(mp.read_text())
+    meta["youtube"] = youtube
+    mp.write_text(json.dumps(meta))
+    at = world.clock.t - pubmod.MEDIA_SETTLE_SEC - 1
+    os.utime(mp, (at, at))
+
+
+def _recorded(world) -> set[str]:
+    """Every key the state says the bucket holds (JSON and media files)."""
+    state = _dest_state(world)
+    return set(state.get("objects") or {}) | set(state.get("media") or {})
+
+
+def _deletes(s3) -> list[str]:
+    return [k for c in s3.calls if c[0] == "delete_objects" for k in c[1]]
+
+
+@pytest.mark.parametrize("youtube,expected", [
+    (yt_record(), YT_ID),
+    (yt_record(privacy="unlisted"), YT_ID),
+    (yt_record(privacy="private"), None),                # a viewer cannot play it
+    ({"en": {"id": YT_ID}}, None),                       # privacy never recorded
+    (yt_record(privacy="PUBLIC"), None),                 # not a value the API returns
+    (yt_record("Syn7h3t1c-"), None),                     # 10 characters
+    (yt_record("Syn7h3t1c-AB"), None),                   # 12 characters
+    (yt_record("Syn7h3t1c A"), None),                    # not an id character
+    (yt_record("../../etc/x"), None),                    # 11 characters, not an id
+    ({"en": {"id": 12345678901, "privacy": "public"}}, None),
+    ({"zh": yt_record()["en"]}, None),                   # only a zh upload
+    ({"en": YT_ID}, None),
+    (YT_ID, None),
+    (None, None),
+])
+def test_youtube_id_only_for_a_well_formed_embeddable_en_upload(youtube, expected):
+    meta = {"briefing_file": "v.mp4"}
+    if youtube is not None:
+        meta["youtube"] = youtube
+    assert pubmod.youtube_embed_id(meta) == expected
+
+
+def test_youtube_rules_match_the_dashboard_contract():
+    """contract.ts mirrors the grace period and the id shape for the SPA; the
+    two sides must not drift."""
+    text = (ROOT / "apps/dashboard/src/contract.ts").read_text("utf-8")
+    m = re.search(r"export const YOUTUBE_GRACE_SEC\s*=\s*([0-9_ *]+?)\s*\n", text)
+    assert m, "contract.ts no longer declares YOUTUBE_GRACE_SEC"
+    assert math.prod(int(x.strip().replace("_", "")) for x in m.group(1).split("*")) == (
+        pubmod.YOUTUBE_GRACE_SEC)
+    m = re.search(r"export const YOUTUBE_ID_RE\s*=\s*/(.+)/\s*\n", text)
+    assert m and m.group(1) == pubmod._YOUTUBE_ID_RE.pattern
+
+
+def test_an_embeddable_upload_is_listed_at_once_without_its_video(world, make_pub, s3, clock):
+    d = world.session
+    world.edition(d, youtube=yt_record(privacy="unlisted"),
+                  generated_at=pubmod._iso(clock.t - 600))     # rendered 10 minutes ago
+    assert make_pub().media_cycle()
+    stem = f"media/{d}/video/post-market-recap_{d}"
+    assert set(s3.objects) == {"media/history.json", f"{stem}_cover.png", f"media/{d}/video/meta.json"}
+    (e,) = s3.json("media/history.json")["briefings"]
+    assert e["youtube_id"] == YT_ID and "briefing" not in e
+    assert e["cover"].startswith(f"/{stem}_cover.png?v=")
+
+
+@pytest.mark.parametrize("youtube", [
+    None,                                     # the default record: a malformed id
+    {},                                       # QC refused it, or the upload failed: nothing recorded
+    yt_record(privacy="private"),             # uploaded, but a viewer cannot embed it
+])
+def test_without_an_embeddable_id_an_edition_waits_then_falls_back_to_its_video(
+        world, make_pub, s3, clock, youtube):
+    """publish_youtube records only a successful upload, so a refused or
+    failed one looks exactly like one that has not happened yet: the edition
+    is not listed for YOUTUBE_GRACE_SEC after its generated_at, then its EN
+    mp4 goes up as the fallback."""
+    d = world.session
+    world.edition(d, youtube=youtube, generated_at=pubmod._iso(clock.t - 600))
+    pub = make_pub()
+    assert pub.media_cycle()
+    assert set(s3.objects) == {"media/history.json"}
+    assert s3.json("media/history.json")["briefings"] == []
+
+    clock.t += pubmod.YOUTUBE_GRACE_SEC - 600 - 1            # one second before the end
+    pub.media_cycle()
+    assert set(s3.objects) == {"media/history.json"}
+
+    clock.t += 1
+    assert pub.media_cycle()
+    stem = f"media/{d}/video/post-market-recap_{d}"
+    assert set(s3.objects) == {"media/history.json", f"{stem}.mp4", f"{stem}_cover.png",
+                               f"media/{d}/video/meta.json"}
+    (e,) = s3.json("media/history.json")["briefings"]
+    assert e["briefing"].startswith(f"/{stem}.mp4?v=") and "youtube_id" not in e
+    assert e["cover"].startswith(f"/{stem}_cover.png?v=")
+
+
+def test_the_grace_period_counts_from_generated_at_or_else_the_meta_mtime(world, clock):
+    ed = pubmod.ArchiveEdition(world.session, "video", world.archive, {"briefing_file": "v.mp4"},
+                               meta_mtime=clock.t - 600)
+    assert ed.decide(clock.t) == pubmod.WAITING              # no generated_at: the mtime
+    assert ed.decide(clock.t + pubmod.YOUTUBE_GRACE_SEC) == pubmod.FALLBACK
+    naive = datetime.fromtimestamp(clock.t - 60, timezone.utc).replace(tzinfo=None)
+    ed.meta["generated_at"] = naive.isoformat()              # naive: read as UTC
+    assert ed.generated_epoch() == pytest.approx(clock.t - 60)
+    ed.meta["generated_at"] = "not a time"
+    assert ed.generated_epoch() == clock.t - 600
+    ed.meta["generated_at"] = "2099-01-01T00:00:00+00:00"   # in the future: the mtime
+    assert ed.decide(clock.t) == pubmod.WAITING
+    assert ed.decide(clock.t - 600 + pubmod.YOUTUBE_GRACE_SEC) == pubmod.FALLBACK
+    ed.meta["youtube"] = yt_record()
+    assert ed.decide(clock.t) == pubmod.ON_YOUTUBE
+
+
+def test_a_later_youtube_id_replaces_the_fallback_video(world, make_pub, s3, clock):
+    """Served from the fallback mp4, then a manual retry gets the video onto
+    YouTube: the edition switches to the id, and the mp4 leaves the bucket and
+    the state, but only after the history.json that stops pointing at it."""
+    d = world.day(-1)
+    slot_dir, meta = world.edition(d)
+    pub = make_pub()
+    pub.media_cycle()
+    mp4 = f"media/{d}/video/{meta['briefing_file']}"
+    assert mp4 in s3.objects and mp4 in _dest_state(world)["media"]
+    assert "briefing" in s3.json("media/history.json")["briefings"][0]
+
+    clock.t += 3600
+    _record_upload(world, slot_dir, yt_record())
+    s3.reset_calls()
+    assert pub.media_cycle()
+    (e,) = s3.json("media/history.json")["briefings"]
+    assert e["youtube_id"] == YT_ID and "briefing" not in e and "cover" in e
+    assert mp4 not in s3.objects and mp4 not in _dest_state(world)["media"]
+    assert _deletes(s3) == [mp4]
+    ops = [c[1] if c[0] == "put_object" else "DELETE" for c in s3.calls
+           if c[0] in ("put_object", "delete_objects")]
+    assert ops == ["media/history.json", "DELETE"]           # meta.json unchanged: not re-sent
+
+    clock.t += 3600                                         # flipped to private on YouTube
+    _record_upload(world, slot_dir, yt_record(privacy="private"))
+    assert pub.media_cycle()
+    (e,) = s3.json("media/history.json")["briefings"]
+    assert "youtube_id" not in e and e["briefing"].split("?")[0] == f"/{mp4}"
+    assert mp4 in s3.objects                                 # re-sent: the state had forgotten it
+
+
+def test_nothing_is_deleted_while_history_json_still_points_at_it(world, make_pub, s3, clock):
+    d = world.day(-1)
+    slot_dir, meta = world.edition(d)
+    pub = make_pub()
+    pub.media_cycle()
+    mp4 = f"media/{d}/video/{meta['briefing_file']}"
+    _record_upload(world, slot_dir, yt_record())
+    s3.fail_keys = {"media/history.json"}
+    clock.t += 60
+    assert pub.media_cycle() is False
+    assert mp4 in s3.objects and _deletes(s3) == []
+    assert "briefing" in s3.json("media/history.json")["briefings"][0]
+
+    s3.fail_keys = set()
+    clock.t += 60
+    assert pub.media_cycle()
+    assert mp4 not in s3.objects and "youtube_id" in s3.json("media/history.json")["briefings"][0]
+
+
+def _old_layout(world, s3, d: str, slot: str = "video") -> dict[str, str]:
+    """What the publisher before 2026-11-27 left for an edition: EN AND zh
+    videos and covers. Returns {"en"|"zh"|"cover"|...: key}."""
+    stem = f"media/{d}/{slot}/post-market-recap_{d}"
+    keys = {"en": f"{stem}.mp4", "zh": f"{stem}_zh.mp4", "cover": f"{stem}_cover.png",
+            "cover_zh": f"{stem}_cover_zh.png", "bili": f"{stem}_cover_zh_bili.png",
+            "meta": f"media/{d}/{slot}/meta.json"}
+    for k in keys.values():
+        s3.objects[k] = {"body": b"old " + k.encode()}
+    return keys
+
+
+def test_reconciliation_converges_the_bucket_and_touches_nothing_else(world, make_pub, s3,
+                                                                     clock):
+    d_yt, d_fb, d_gone, d_busy = world.day(-1), world.day(-2), world.day(-3), world.day(-4)
+    old = world.day(-pubmod.DEFAULT_RETENTION_DAYS - 1)
+    world.edition(d_yt, youtube=yt_record())
+    world.edition(d_fb)
+    world.edition(d_busy, age=10)                  # meta.json being rewritten right now
+    yt, fb, gone, busy = (_old_layout(world, s3, d) for d in (d_yt, d_fb, d_gone, d_busy))
+    s3.objects[f"media/{d_yt}/video/clip_ACME.mp4"] = {"body": b"a scene clip"}
+    s3.objects[f"media/{d_fb}/video/notes.txt"] = {"body": b"stray"}
+    s3.objects[f"media/{old}/video/a.mp4"] = {"body": b"old date"}
+    others = {"media/history.json", "snapshot/latest.json", "chart/ACME.json",
+              f"look/{d_yt}/plate.png", f"look/{d_gone}/keyframe.png", f"approvals/{d_yt}.json"}
+    for k in others:
+        s3.objects[k] = {"body": b"{}"}
+    pub = make_pub()
+    # the old publisher's state still lists the zh uploads
+    zh_keys = [yt["zh"], yt["cover_zh"], fb["zh"]]
+    pub.state.update(lambda d: d.setdefault("media", {}).update(
+        {k: {"sha256": "0" * 64, "size": 1, "mtime_ns": 1, "at": 1.0} for k in zh_keys}))
+
+    assert pub.media_cycle()
+
+    assert set(s3.objects) == others | {
+        yt["cover"], yt["meta"],                                    # on YouTube: no mp4
+        fb["en"], fb["cover"], fb["meta"],                          # fallback
+        busy["en"], busy["cover"], busy["meta"],                    # unknown yet: EN kept
+    }
+    deleted = set(_deletes(s3))
+    assert {yt["zh"], yt["bili"], yt["en"], fb["zh"], busy["zh"], busy["cover_zh"],
+            *gone.values(), f"media/{d_yt}/video/clip_ACME.mp4",
+            f"media/{old}/video/a.mp4"} <= deleted
+    assert not deleted & others
+    state = _dest_state(world)
+    assert not set(state["media"]) & set(zh_keys) and yt["en"] not in state["media"]
+    hist = s3.json("media/history.json")
+    assert [e["date"] for e in hist["briefings"]] == [d_yt, d_fb]
+    assert_zh_free(hist)
+
+    s3.reset_calls()                                # converged: the next run deletes nothing
+    clock.t += 60
+    assert pub.media_cycle() and _deletes(s3) == []
+
+
+def test_reconciliation_logs_counts_not_keys(world, make_pub, s3, caplog):
+    world.edition(world.day(-1), youtube=yt_record())
+    keys = _old_layout(world, s3, world.day(-1))
+    caplog.set_level(logging.INFO, logger="publisher")
+    make_pub().media_cycle()
+    line = next(r.getMessage() for r in caplog.records if "deleted=" in r.getMessage())
+    assert "deleted=4" in line and "youtube=1" in line      # EN + zh mp4, zh + bili covers
+    assert not [k for k in keys.values() if k in caplog.text]
+
+
+def test_an_unreadable_archive_only_loses_its_zh_objects(world, make_pub, s3, monkeypatch):
+    """/mnt/sandisk not mounted: nobody knows which editions exist, so the EN
+    objects stay; the zh cut is never wanted, so it goes anyway."""
+    keys = _old_layout(world, s3, world.day(-1))
+    monkeypatch.setattr(web_server, "MEDIA_ARCHIVE_DIR", world.tmp / "not-mounted")
+    make_pub().media_cycle()
+    assert {keys["en"], keys["cover"], keys["meta"]} <= set(s3.objects)
+    assert not {keys["zh"], keys["cover_zh"], keys["bili"]} & set(s3.objects)
+
+
+def _publish_dates(world, pub, s3, n: int) -> tuple[list[str], set[str]]:
+    """n editions on YouTube, dated yesterday and back, published once.
+    Returns (dates, every key the bucket then holds but history.json)."""
+    dates = [world.day(-i) for i in range(1, n + 1)]
+    for d in dates:
+        world.edition(d, youtube=yt_record())
+    assert pub.media_cycle()
+    return dates, {k for k in s3.objects if k != "media/history.json"}
+
+
+@pytest.mark.parametrize("tonight", ["empty", "folder-only", "rendered"])
+def test_an_archive_that_lost_its_editions_keeps_their_objects(world, make_pub, s3, clock,
+                                                               caplog, tonight):
+    """/mnt/sandisk not mounted, but the path is there: empty, or holding only
+    tonight's folder that generate.py's mkdir recreated, before or after its
+    meta.json is written. None of that says the other editions are gone, so
+    every EN object of the other dates stays (and stays in the state, so
+    nothing is re-sent when the disk is back); only the zh cut goes."""
+    pub = make_pub()
+    dates, en = _publish_dates(world, pub, s3, 5)
+    assert len(en) == 10                                    # meta.json + cover each
+    zh = f"media/{dates[0]}/video/post-market-recap_{dates[0]}_zh.mp4"
+    s3.objects[zh] = {"body": b"old zh"}
+    on_disk = world.tmp / "archive-on-the-disk"
+    world.archive.rename(on_disk)
+    world.archive.mkdir()
+    if tonight == "folder-only":
+        (world.archive / world.session / "video").mkdir(parents=True)
+    elif tonight == "rendered":
+        world.edition(world.session, youtube=yt_record())
+    caplog.set_level(logging.ERROR, logger="publisher")
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    assert en <= set(s3.objects) and en <= _recorded(world)
+    assert _deletes(s3) == [zh]
+    if tonight == "rendered":
+        assert "5 of the 6 editions in the bucket's window vanished" in caplog.text
+        assert not [d for d in dates if d in caplog.text]   # counts, never keys
+
+    if tonight == "rendered":                               # the disk is back
+        shutil.move(world.archive / world.session, on_disk / world.session)
+    shutil.rmtree(world.archive)
+    on_disk.rename(world.archive)
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    assert s3.written() == ["media/history.json"]           # listed again, nothing re-sent
+    listed = [e["date"] for e in s3.json("media/history.json")["briefings"]]
+    assert listed == ([world.session] if tonight == "rendered" else []) + dates
+
+
+@pytest.mark.parametrize("editions,removed,deleted", [
+    (5, 1, True),           # one bad render removed by hand
+    (8, 2, True),           # two, and no more than a quarter of the window
+    (5, 2, False),          # more than a quarter of the window at once
+    (12, 3, False),         # more than MAX_VANISHED_EDITIONS at once
+    (3, 1, False),          # a small window: even one is more than a quarter
+])
+def test_editions_gone_from_the_archive_are_deleted_unless_too_many_vanish_at_once(
+        world, make_pub, s3, clock, caplog, editions, removed, deleted):
+    pub = make_pub()
+    dates, before = _publish_dates(world, pub, s3, editions)
+    gone = dates[-removed:]
+    for d in gone:
+        shutil.rmtree(world.archive / d)
+    caplog.set_level(logging.ERROR, logger="publisher")
+    s3.reset_calls()
+    clock.t += 60
+    assert pub.media_cycle()
+    theirs = {k for k in before if k.split("/")[1] in gone}
+    assert len(theirs) == 2 * removed
+    if deleted:
+        assert set(_deletes(s3)) == theirs and not theirs & set(s3.objects)
+        assert not theirs & _recorded(world)
+        assert "vanished" not in caplog.text
+    else:
+        assert _deletes(s3) == [] and before <= set(s3.objects)
+        assert f"{removed} of the {editions} editions" in caplog.text
+    listed = [e["date"] for e in s3.json("media/history.json")["briefings"]]
+    assert listed == dates[:editions - removed]
+
+
+@pytest.mark.parametrize("damage", ["not-json", "not-an-object", "removed", "unreadable-folder"])
+def test_an_edition_whose_meta_json_cannot_be_read_keeps_its_objects(world, make_pub, s3,
+                                                                     clock, damage):
+    """A meta.json that fails to parse, is not an object, is gone, or sits in
+    a date folder that cannot be listed tells nothing about the edition: its
+    objects stay, and only its zh objects go."""
+    d = world.day(-1)
+    slot_dir, meta = world.edition(d, youtube=yt_record())
+    world.edition(world.day(-2), youtube=yt_record())       # read normally: the scan is not empty
+    pub = make_pub()
+    assert pub.media_cycle()
+    mine = {f"media/{d}/video/meta.json", f"media/{d}/video/{meta['cover_file']}"}
+    assert mine <= set(s3.objects)
+    zh = {f"media/{d}/video/{meta['briefing_file_zh']}", f"media/{d}/video/{meta['cover_file_zh']}"}
+    for k in zh:
+        s3.objects[k] = {"body": b"old zh"}
+    clock.t += 60
+    mp = slot_dir / "meta.json"
+    if damage == "not-json":
+        mp.write_text("{not json")
+    elif damage == "not-an-object":
+        mp.write_text("[]")
+    elif damage == "removed":
+        mp.unlink()
+    if mp.exists():                                         # settled: the scan does read it
+        at = clock.t - pubmod.MEDIA_SETTLE_SEC - 1
+        os.utime(mp, (at, at))
+    s3.reset_calls()
+    if damage == "unreadable-folder":
+        os.chmod(world.archive / d, 0)
+    try:
+        assert pub.media_cycle()
+    finally:
+        os.chmod(world.archive / d, 0o755)
+    assert mine <= set(s3.objects) and mine <= _recorded(world)
+    assert set(_deletes(s3)) == zh
+
+
+def test_dry_run_reconciliation_deletes_nothing_and_prints_each_delete(world, s3, clock):
+    world.edition(world.day(-1), youtube=yt_record())
+    keys = _old_layout(world, s3, world.day(-1))
+    before = {k: dict(v) for k, v in s3.objects.items()}
+    out = io.StringIO()
+    pub = pubmod.Publisher(R2Destination(s3, "alpaca-dashboard", account_id="0" * 32),
+                           world.state_dir, pubmod.Options(dry_run=True), clock=clock, out=out)
+    assert pub.media_cycle()
+    assert s3.objects == before and _deletes(s3) == []
+    assert not world.state_dir.exists()
+    text = out.getvalue()
+    for k in ("en", "zh", "cover_zh", "bili"):
+        assert f"[dry-run] DELETE {keys[k]}\n" in text
+    for k in ("cover", "meta"):
+        assert f"[dry-run] DELETE {keys[k]}" not in text
+
+
+def test_an_object_gone_from_the_bucket_is_sent_again(world, make_pub, s3, clock, caplog):
+    d = world.day(-1)
+    _, meta = world.edition(d)
+    pub = make_pub()
+    pub.media_cycle()
+    cover = f"media/{d}/video/{meta['cover_file']}"
+    del s3.objects[cover]                         # removed by hand, or expired
+    caplog.set_level(logging.WARNING, logger="publisher")
+    clock.t += 60
+    pub.media_cycle()
+    assert "1 uploaded object(s) are not in the bucket" in caplog.text
+    clock.t += 60
+    pub.media_cycle()
+    assert cover in s3.objects
+
+
+def test_no_zh_field_or_file_ever_reaches_the_bucket(world, tmp_path):
+    d = world.day(-1)
+    world.edition(d, legacy=True, youtube={**yt_record(), "zh": yt_record(YT_ID2)["en"]},
+                  meta_extra={"keywords_zh": ["关键词"], "title_zh_previous": "旧标题",
+                              "youtube_superseded": [{"id": YT_ID2, "reason": "redo"}],
+                              "youtube_id": "Forged_id_1"})
+    world.edition(world.day(-2), "video",
+                  meta_extra={"cover_file": f"post-market-recap_{world.day(-2)}_cover_zh.png"})
+    d3 = world.day(-3)        # Chinese text under English-named fields (old story renders)
+    world.edition(d3, "video", meta_extra={"clips": [
+        {"symbol": "DESK", "clip_file": "clip_DESK.mp4", "duration_s": 5.0, "bias": None,
+         "headline": "Rally 大涨", "mood": "紧张"}]})
+    out = tmp_path / "bucket"
+    assert pubmod.main(["--out-dir", str(out), "--media"], clock=world.clock) == 0
+    names = _tree(out)
+    assert names and not [n for n in names if pubmod.is_zh(n.rsplit("/", 1)[-1])]
+    for n in names:
+        if n.startswith("media/") and n.endswith(".json"):
+            assert_zh_free(json.loads((out / n).read_text()), n)
+    meta = json.loads((out / f"media/{d}/video/meta.json").read_text())
+    assert "youtube_superseded" not in meta and "youtube_id" not in meta
+    hist = json.loads((out / "media/history.json").read_text())
+    assert hist["briefings"][0]["youtube_id"] == YT_ID       # the validated EN id only
+    assert "cover" not in hist["briefings"][1]               # a zh file is never a cover
+    (clip,) = json.loads((out / f"media/{d3}/video/meta.json").read_text())["clips"]
+    assert clip["headline"] == "Rally" and "mood" not in clip
 
 
 # --------------------------------------------------------------------------

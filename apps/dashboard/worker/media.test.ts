@@ -6,7 +6,8 @@ import { accessEnv, makeSigner, mint, serveCerts, TEAM_DOMAIN, type Signer } fro
 import { call, type CallInit } from './test/call.ts'
 import { FakeR2Bucket } from './test/fake-r2.ts'
 
-const VIDEO_PATH = '2026-03-04/video/post-market-recap_2026-03-04.mp4'
+// The fallback edition's mp4: a YouTube edition's video is never in R2.
+const VIDEO_PATH = '2026-03-04/slideshow-midday-briefing/midday-briefing_2026-03-04.mp4'
 const SIZE = 1000
 const VIDEO = Uint8Array.from({ length: SIZE }, (_, i) => i % 251)
 
