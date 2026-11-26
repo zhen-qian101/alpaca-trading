@@ -1512,6 +1512,9 @@ def test_the_grace_period_counts_from_generated_at_or_else_the_meta_mtime(world,
     assert ed.generated_epoch() == pytest.approx(clock.t - 60)
     ed.meta["generated_at"] = "not a time"
     assert ed.generated_epoch() == clock.t - 600
+    ed.meta["generated_at"] = "2099-01-01T00:00:00+00:00"   # in the future: the mtime
+    assert ed.decide(clock.t) == pubmod.WAITING
+    assert ed.decide(clock.t - 600 + pubmod.YOUTUBE_GRACE_SEC) == pubmod.FALLBACK
     ed.meta["youtube"] = yt_record()
     assert ed.decide(clock.t) == pubmod.ON_YOUTUBE
 
@@ -1805,6 +1808,10 @@ def test_no_zh_field_or_file_ever_reaches_the_bucket(world, tmp_path):
                               "youtube_id": "Forged_id_1"})
     world.edition(world.day(-2), "video",
                   meta_extra={"cover_file": f"post-market-recap_{world.day(-2)}_cover_zh.png"})
+    d3 = world.day(-3)        # Chinese text under English-named fields (old story renders)
+    world.edition(d3, "video", meta_extra={"clips": [
+        {"symbol": "DESK", "clip_file": "clip_DESK.mp4", "duration_s": 5.0, "bias": None,
+         "headline": "Rally 大涨", "mood": "紧张"}]})
     out = tmp_path / "bucket"
     assert pubmod.main(["--out-dir", str(out), "--media"], clock=world.clock) == 0
     names = _tree(out)
@@ -1817,6 +1824,8 @@ def test_no_zh_field_or_file_ever_reaches_the_bucket(world, tmp_path):
     hist = json.loads((out / "media/history.json").read_text())
     assert hist["briefings"][0]["youtube_id"] == YT_ID       # the validated EN id only
     assert "cover" not in hist["briefings"][1]               # a zh file is never a cover
+    (clip,) = json.loads((out / f"media/{d3}/video/meta.json").read_text())["clips"]
+    assert clip["headline"] == "Rally" and "mood" not in clip
 
 
 # --------------------------------------------------------------------------

@@ -225,6 +225,10 @@ _META_DROP = ("desk", "youtube", "youtube_superseded", "youtube_id")
 # ..._cover_zh_bili.png). Such a field is stripped from everything uploaded,
 # and such an object is deleted from the bucket wherever it is found.
 _ZH_WORD_RE = re.compile(r"(?:^|[._-])zh(?:[._-]|$)", re.IGNORECASE)
+# Chinese text under a field whose NAME is not zh (e.g. an old story render's
+# clips[].mood): scrubbed out of every uploaded string, so nothing of the
+# Chinese cut reaches the cloud even by way of an English-named field.
+_CJK_RE = re.compile(r"[\u3000-\u303f\u3400-\u9fff\uff00-\uffef]")
 # media/<date>/<slot>/<rest>: an edition's object.
 _EDITION_KEY_RE = re.compile(r"^media/(\d{4}-\d{2}-\d{2})/([^/]+)/(.+)$")
 
@@ -587,11 +591,15 @@ def is_zh(name: object) -> bool:
 
 
 def strip_zh(obj):
-    """`obj` without any zh field, at any depth (edition and clip level)."""
+    """`obj` without any zh field, at any depth (edition and clip level), and
+    with Chinese characters scrubbed out of every string that is left (a
+    string is changed only when it held some; the field keeps its type)."""
     if isinstance(obj, dict):
         return {k: strip_zh(v) for k, v in obj.items() if not is_zh(k)}
     if isinstance(obj, list):
         return [strip_zh(v) for v in obj]
+    if isinstance(obj, str) and _CJK_RE.search(obj):
+        return " ".join(_CJK_RE.sub(" ", obj).split())
     return obj
 
 
@@ -661,7 +669,10 @@ class ArchiveEdition:
     def decide(self, now: float) -> str:
         if self.youtube_id:
             return ON_YOUTUBE
-        if now - self.generated_epoch() >= YOUTUBE_GRACE_SEC:
+        made = self.generated_epoch()
+        if made > now + 300:            # a stamp in the future (hand edit, clock skew)
+            made = min(self.meta_mtime, now)    # would keep it WAITING until then
+        if now - made >= YOUTUBE_GRACE_SEC:
             return FALLBACK
         return WAITING
 
@@ -703,6 +714,8 @@ class ArchiveEdition:
         for c in m.get("clips") or []:
             if isinstance(c, dict):
                 c.pop("file", None)
+                if c.get("mood") == "":     # was Chinese only; strip_zh emptied it
+                    c.pop("mood")
         m.setdefault("date", self.date)
         m["kind"] = "slideshow" if self.slot.startswith("slideshow") else "video"
         m["slot"] = self.slot
