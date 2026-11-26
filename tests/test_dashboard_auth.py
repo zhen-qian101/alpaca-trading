@@ -33,7 +33,7 @@ import pytest
 from web import server as web_server
 
 ROOT = Path(__file__).resolve().parent.parent
-TOKEN = "s3cret-Tok_en"
+TOKEN = "not-a-real-token"
 
 
 @pytest.fixture
@@ -292,7 +292,8 @@ def test_an_unwritable_token_file_stops_startup_without_the_token(start, capsys,
         seen["token"] = real(n)
         return seen["token"]
 
-    monkeypatch.setattr(web_server.secrets, "token_urlsafe", spy)
+    gen = web_server.secrets
+    monkeypatch.setattr(gen, "token_urlsafe", spy)
     with pytest.raises(SystemExit) as exc:
         start(capsys, "--host", "0.0.0.0", "--port", "1")
     out = capsys.readouterr()

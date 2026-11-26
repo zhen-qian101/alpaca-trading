@@ -1,0 +1,4 @@
+# Reviewed false positives (gitleaks reads this file from the repository root).
+# A made-up test token in the first commit, never a real credential; later
+# commits use a low-entropy placeholder instead.
+c9b96aa52220569ac8d62dcb5af76e37aef4e7d3:tests/test_dashboard_auth.py:generic-api-key:36
