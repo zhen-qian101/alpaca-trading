@@ -176,8 +176,10 @@ jobs:
       # wrangler alone. No package.json, so nothing else can be installed there.
       SITE_DIR: site
       # The version in apps/portfolio/pnpm-lock.yaml (scripts/workflow.test.ts
-      # checks the two agree).
-      WRANGLER_VERSION: "4.168.0"
+      # checks the two agree). The install's --before applies to it as well,
+      # so it must be at least 7 days old; pnpm's minimumReleaseAge
+      # (apps/portfolio/pnpm-workspace.yaml) refuses to lock a younger one.
+      WRANGLER_VERSION: "4.165.0"
       WRANGLER_SEND_METRICS: "false"
     steps:
       # Secrets cannot appear in `if:`, so their presence is read here first.
@@ -309,7 +311,9 @@ jobs:
       # wrangler alone, at the locked version (--prefix: there is no
       # package.json there, so nothing else is installed). npm resolves
       # wrangler's dependencies without the app's lockfile, so --before holds
-      # them to versions at least 7 days old, the cooldown Dependabot keeps.
+      # them to versions at least 7 days old, the cooldown Dependabot keeps
+      # and the delay pnpm applies to the lockfile. It holds wrangler itself to
+      # that age too: a locked version younger than 7 days is not found.
       # No secret is in this step's environment.
       - name: Install wrangler alone
         if: steps.creds.outputs.ready == 'true' && steps.live.outputs.deploy == 'true'

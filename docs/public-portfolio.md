@@ -523,6 +523,9 @@ workflow.
   `pull_request_target`.
 - Every action is pinned to a full commit SHA, and Dependabot proposes updates
   weekly with a 7-day cooldown: GitHub Actions plus npm for `apps/portfolio`.
+  pnpm enforces the same 7 days on the app's lockfile (`minimumReleaseAge` in
+  `apps/portfolio/pnpm-workspace.yaml`): `pnpm install`, `--frozen-lockfile`
+  included, fails on any locked version younger than that.
 - Checkouts do not persist credentials. Secrets reach steps only through
   `env:` or action inputs, never inside a script, and `workflow.test.ts`
   checks this.
@@ -576,7 +579,7 @@ workflow.
 | Download fails with `NoSuchKey` / 404 | The exporter has not uploaded yet. Run `python -m web.public_export --once` at home. |
 | The gate refuses the file | The exporter's own gate should refuse first, so the home install's schema is probably out of step with `main`. Copy the schema and exporter from `main` (setup step 3). The pointers in the log say which field. |
 | "refused: an object in the file has the same key twice" | The object in the bucket was not written by the exporter (it cannot produce one). Treat it as tampering: check who holds the home write token, delete the object, and let the exporter write it again. |
-| "Install wrangler alone" fails with `ETARGET` / "No matching version" | The locked wrangler (or one of its exact dependencies) is less than 7 days old. Wait for it to age, or keep Dependabot's 7-day cooldown when bumping it. |
+| "Install wrangler alone" fails with `ETARGET` / "No matching version" | The locked wrangler (or one of its exact dependencies) is less than 7 days old. pnpm's `minimumReleaseAge` should have refused that lockfile: check it is still set in `apps/portfolio/pnpm-workspace.yaml`, then lock the newest wrangler at least 7 days old and set `WRANGLER_VERSION` to it. |
 | "Download the built site" fails | The `build` job uploaded no artifact: it only does so when `PORTFOLIO_DEPLOY` is `true` on `main`. Re-run the whole workflow, not the deploy job alone after a day (the artifact is kept 1 day). |
 | "Deploy skipped: The live site already serves this build and this file." | Normal: the home box sent nothing new since the last deploy. |
 | The site says "not updated since ..." | Check in this order: the home cron and `agent/public_export.log`, a banner on the Actions tab saying scheduled workflows are disabled (see Keep-alive), and whether `PORTFOLIO_DEPLOY` is still `true`. |
