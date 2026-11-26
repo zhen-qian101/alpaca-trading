@@ -13,7 +13,7 @@ updates:
         patterns: ["*"]
 
   # The cloud dashboard (apps/dashboard, pnpm). One grouped PR a week, and only
-  # for releases at least 7 days old, the same supply-chain delay pnpm applies.
+  # for releases at least 7 days old.
   - package-ecosystem: npm
     directory: /apps/dashboard
     schedule:
@@ -24,7 +24,11 @@ updates:
       dashboard:
         patterns: ["*"]
 
-  # The public portfolio site (apps/portfolio, pnpm), on the same terms.
+  # The public portfolio site (apps/portfolio, pnpm), on the same terms. pnpm
+  # enforces the same 7 days there (minimumReleaseAge in
+  # apps/portfolio/pnpm-workspace.yaml): an install refuses a lockfile that
+  # holds a younger version, and the deploy, which installs the locked wrangler
+  # with npm --before 7 days ago, could not find a younger one.
   - package-ecosystem: npm
     directory: /apps/portfolio
     schedule:

@@ -5,3 +5,12 @@
 allowBuilds:
   esbuild: true
   workerd: true
+
+# Supply-chain delay: only releases at least 7 days old (10080 minutes), the
+# cooldown .github/dependabot.yml keeps. pnpm resolves nothing younger, and
+# every install, `--frozen-lockfile` in CI included, refuses a lockfile that
+# holds a younger version (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION). It also
+# keeps the deploy working: that job installs the locked wrangler on its own
+# with npm `--before` 7 days ago (.github/workflows/portfolio.yml), which
+# cannot find a wrangler locked any younger.
+minimumReleaseAge: 10080
