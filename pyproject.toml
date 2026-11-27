@@ -1,3 +1,8 @@
+# Dependabot alerts land on requirements/constraints.txt (the production venv's
+# exact versions), but its dependency graph only reads that file when it scans
+# the repo root. A push that changes requirements/ alone starts a scan of that
+# folder, which does not count constraints.txt as a manifest, so fixed alerts
+# stay open. Change a root manifest (this file) in the same push as the pins.
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
